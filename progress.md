@@ -9,35 +9,27 @@
   - LICENSE (MIT)
   - docs/adr/0001-initial-scope-name-and-bootstrap.md
   - docs/adr/0002-branching-model-and-workflow.md
-  - docs/plans/2026-06-25-prompt-os-implementation-plan.md (detailed bite-sized phases)
+  - docs/plans/2026-06-25-prompt-os-implementation-plan.md
   - docs/blueprint-schema.md
-  - research/ folder with initial notes (TUI comparison, live ISO, blueprint schema)
-- TUI decision: **Go + Bubble Tea** (static binary, minimal ISO friendly)
+  - research/ folder with initial notes
+- TUI decision: **Go + Bubble Tea**
 - Working branch: `dev`
 
-## Phase 1 Complete + Code Review (2026-06-25)
-- Task 1.1–1.4 delivered and building cleanly
-- All **4 critical issues** from automated code review resolved:
-  - API key masking (`EchoPassword`)
-  - Keyboard trapping in provider screen
-  - Wizard state / off-by-one mismatch
-  - Hardware scan disk parsing + bounds checks
-- PR updated with fixes (`dev` branch)
+## Phase 1 Complete + Code Review
+- All 4 critical issues from automated review fixed
+- PR #1 updated with fixes
 
-## Original Source
-- Transcript: Google Doc ID `1tE_YMHs8Lx6NCmBzKOT2vjllmOZqHd2dGRBm4QV5vIY`
-- Related previous work: https://github.com/HappyMonkeyAI/vibes (TUI patterns may be reusable)
+## Phase 2 Complete + Code Review (PR #3)
+- Task 2.1: LLMClient interface + OpenAI / Ollama implementations
+- Task 2.2: Blueprint struct, system prompt, validator
+- Task 2.3: BlueprintModel TUI integration
+- All critical issues from two rounds of code review addressed:
+  - Mock Generate methods now return valid JSON
+  - Path traversal protection added to validator
+  - System prompt now used in LLM calls
+  - Validator distro check hardened
 
-## Next Immediate Actions
-1. Start **Phase 2: LLM Orchestration**
-   - Task 2.1: Provider client abstraction (`internal/llm/provider.go`)
-   - Task 2.2: System prompt + structured JSON output + validator
-   - Task 2.3: Wire wizard + hardware data into LLM blueprint generation
-2. Update progress after each Phase 2 task
+## Next
+Ready to begin **Phase 3: Execution Engine** when we resume.
 
-## Notes for Next Agent
-- Follow the detailed plan in `docs/plans/2026-06-25-prompt-os-implementation-plan.md`
-- Work on `dev` branch, PR to `main` at phase boundaries
-- Use writing-plans skill for any new implementation tasks
-
-**Status:** Phase 1 (TUI Foundation) **complete and code-reviewed**. All 4 critical issues from automated review fixed. Ready to start **Phase 2: LLM Orchestration**.
+**Status:** Phase 2 complete and reviewed. All critical defects resolved.

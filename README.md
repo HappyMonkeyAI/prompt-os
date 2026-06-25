@@ -8,7 +8,7 @@ Instead of a static ISO or pre-baked distro, it acts as an intelligent orchestra
 
 **Core Idea (from initial concept transcript):** A "never the same twice" installer that keeps the maintenance burden on upstream package managers and LLMs, delivering a self-healing, voice-first, AI-ready desktop with baked-in provider credentials and an emergency triage agent.
 
-**Status:** Bootstrap / Research Phase. Minimal viable TUI orchestrator + execution engine on top of proven tools like archinstall, debootstrap, or pacstrap.
+**Status:** Phase 2 (LLM Orchestration) complete and reviewed. All critical defects from code reviews resolved. Ready for Phase 3.
 
 See `CONTEXT.md` for operating manual, `research/` for references, and `docs/adr/` for decisions.
 
@@ -27,9 +27,9 @@ PromptOS (chosen after availability check; academic paper only, no active OS/dis
 - Extensible to GUI later.
 
 ## Tech Directions (Initial)
-- TUI: Go + Bubble Tea or Python + Textual (tradeoff analysis pending research).
-- Base: Alpine live for installer host; target any major distro.
-- Execution: chroot + standard bootstrap tools + AI-generated JSON blueprints.
-- Security: Bake keys into /etc/environment.d or user keyring; emergency agent for diagnostics.
+- TUI: Go + Bubble Tea (chosen for static binary on minimal live ISO)
+- LLM: Pluggable client abstraction (OpenAI, Anthropic, Gemini, Ollama)
+- Structured output: JSON Blueprint validated against schema
+- Execution: archinstall / debootstrap / pacstrap
 
-Project bootstrapped per standard repository governance (README, CONTEXT, HERMES, ADR, research). Deep research on related installers, TUIs, key storage, and novelty ongoing.
+See `docs/plans/2026-06-25-prompt-os-implementation-plan.md` for the detailed roadmap.

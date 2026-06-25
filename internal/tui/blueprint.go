@@ -31,13 +31,14 @@ func NewBlueprintModel(client llm.LLMClient, wizard WizardModel, hw hardware.Har
 
 func (m BlueprintModel) Init() tea.Cmd {
 	return func() tea.Msg {
-		// Build a simple prompt from wizard + hardware
-		prompt := fmt.Sprintf(
+		// Build a combined prompt using the system prompt + user context
+		userPrompt := fmt.Sprintf(
 			"User preferences: %v\nHardware: %+v\nGenerate a Linux installation blueprint.",
 			m.wizard.Answers(), m.hw,
 		)
+		fullPrompt := llm.SystemPrompt + "\n\n" + userPrompt
 
-		resp, err := m.client.Generate(context.Background(), prompt)
+		resp, err := m.client.Generate(context.Background(), fullPrompt)
 		if err != nil {
 			return errMsg{err}
 		}

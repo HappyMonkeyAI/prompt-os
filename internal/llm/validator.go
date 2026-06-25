@@ -3,7 +3,6 @@ package llm
 import (
 	"encoding/json"
 	"errors"
-	"strings"
 )
 
 var ErrInvalidBlueprint = errors.New("llm: invalid blueprint JSON")
@@ -23,7 +22,9 @@ func ValidateBlueprint(data []byte) (*Blueprint, error) {
 	if bp.StabilityPreference == "" {
 		bp.StabilityPreference = "stable"
 	}
-	if !strings.Contains("arch ubuntu debian", bp.BaseDistro) {
+
+	validDistros := map[string]bool{"arch": true, "ubuntu": true, "debian": true}
+	if !validDistros[bp.BaseDistro] {
 		return nil, ErrInvalidBlueprint
 	}
 

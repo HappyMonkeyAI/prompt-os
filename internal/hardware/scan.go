@@ -25,7 +25,10 @@ func Scan() HardwareInfo {
 	if out, err := exec.Command("lscpu").Output(); err == nil {
 		for _, line := range strings.Split(string(out), "\n") {
 			if strings.HasPrefix(line, "Model name:") {
-				info.CPU = strings.TrimSpace(strings.SplitN(line, ":", 2)[1])
+				parts := strings.SplitN(line, ":", 2)
+				if len(parts) == 2 {
+					info.CPU = strings.TrimSpace(parts[1])
+				}
 				break
 			}
 		}

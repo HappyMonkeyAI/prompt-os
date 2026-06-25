@@ -40,8 +40,8 @@ func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.answers[m.currentKey()] = m.input.Value()
 			}
-			m.step++
 			m.resetInput()
+			m.step++
 			if m.step > 3 {
 				return m, tea.Quit // done
 			}

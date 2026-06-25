@@ -64,13 +64,13 @@ func Scan() HardwareInfo {
 		info.RAM = "unknown"
 	}
 
-	// Disk (df -h /)
+	// Disk (df -h /) — correct column for "used"
 	if out, err := exec.Command("df", "-h", "/").Output(); err == nil {
 		lines := strings.Split(string(out), "\n")
 		if len(lines) > 1 {
 			fields := strings.Fields(lines[1])
-			if len(fields) > 1 {
-				info.Disk = fields[1] + " used"
+			if len(fields) > 2 {
+				info.Disk = fields[2] + " used"
 			}
 		}
 	}

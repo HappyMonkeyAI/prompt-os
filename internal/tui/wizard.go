@@ -19,18 +19,20 @@ func NewWizardModel() WizardModel {
 	ti.Focus()
 	ti.Width = 50
 
-	return WizardModel{
+	m := WizardModel{
 		step:    0,
 		answers: make(map[string]string),
 		input:   ti,
-		choices: []string{},
 	}
+	m.resetForStep(0)
+	return m
 }
 
 func (m WizardModel) Init() tea.Cmd { return textinput.Blink }
 
 func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -40,11 +42,11 @@ func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.answers[m.currentKey()] = m.input.Value()
 			}
-			m.resetInput()
 			m.step++
 			if m.step > 3 {
-				return m, tea.Quit // done
+				return m, tea.Quit
 			}
+			m.resetForStep(m.step)
 		case "up", "k":
 			if m.selected > 0 {
 				m.selected--
@@ -57,6 +59,7 @@ func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	}
+
 	if len(m.choices) == 0 {
 		m.input, cmd = m.input.Update(msg)
 	}
@@ -79,11 +82,12 @@ func (m WizardModel) View() string {
 	return title + "\n\n" + m.input.View() + "\n(enter to continue, q to quit)"
 }
 
-func (m *WizardModel) resetInput() {
+func (m *WizardModel) resetForStep(step int) {
 	m.input.SetValue("")
 	m.choices = nil
 	m.selected = 0
-	switch m.step {
+
+	switch step {
 	case 0:
 		m.choices = []string{"arch", "ubuntu", "debian"}
 	case 1:

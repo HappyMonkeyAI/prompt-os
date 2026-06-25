@@ -20,6 +20,7 @@ func NewProviderModel() ProviderModel {
 	ti.Focus()
 	ti.CharLimit = 128
 	ti.Width = 40
+	ti.EchoMode = textinput.EchoPassword // mask the key
 
 	return ProviderModel{
 		providers: []string{"openai", "anthropic", "gemini", "ollama"},
@@ -35,6 +36,19 @@ func (m *ProviderModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		// When validating, only handle key input + quit
+		if m.validating {
+			switch msg.String() {
+			case "enter":
+				return m, nil // let parent consume the final enter
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			}
+			m.keyInput, cmd = m.keyInput.Update(msg)
+			return m, cmd
+		}
+
+		// Normal provider selection mode
 		switch msg.String() {
 		case "up", "k":
 			if m.selected > 0 {
@@ -47,15 +61,13 @@ func (m *ProviderModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			m.provider = m.providers[m.selected]
 			m.validating = true
+			m.keyInput.Focus()
 			return m, nil
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		}
 	}
 
-	if m.validating {
-		m.keyInput, cmd = m.keyInput.Update(msg)
-	}
 	return m, cmd
 }
 

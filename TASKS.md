@@ -10,10 +10,12 @@ For historical decisions, see `docs/decisions/`.
 
 ## Active / Next
 
-- [ ] Wire TUI: blueprint approval → execute pipeline (dry-run default)
-- [ ] Phase 4: Security & key baking hardening (`internal/security/`)
+- [x] Wire TUI: blueprint approval → execute pipeline (dry-run default)
+- [x] Phase 4: Security & key baking hardening (`internal/security/`)
 - [x] Task 4.2: Emergency triage shell (`internal/security/triage_agent.go` + stub shell)
-- [ ] Optional: PR `main` ← `dev` for Phase 3 milestone
+- [ ] Task 5.1: Minimal live ISO build artifacts (`build/`)
+- [ ] Task 5.2: End-to-end VM test
+- [ ] Optional: PR `main` ← `dev` for Phase 3/4 milestone
 
 ## Completed
 

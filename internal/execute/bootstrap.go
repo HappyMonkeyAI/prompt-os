@@ -3,6 +3,9 @@ package execute
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/HappyMonkeyAI/prompt-os/internal/llm"
@@ -11,7 +14,10 @@ import (
 var (
 	ErrUnsupportedDistro = errors.New("execute: unsupported base_distro for bootstrap")
 	ErrEmptyMountRoot    = errors.New("execute: mount root is required")
+	ErrUnsafePackageName = errors.New("execute: unsafe package name")
 )
+
+var packageNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+._:@-]*$`)
 
 // InstallOptions controls base system installation into a prepared chroot.
 type InstallOptions struct {
@@ -45,6 +51,9 @@ func BuildBootstrapPlan(opts InstallOptions) ([]string, error) {
 	pkgs := append([]string(nil), opts.Blueprint.Packages...)
 	if len(pkgs) == 0 {
 		pkgs = defaultPackages(opts.Blueprint.BaseDistro)
+	}
+	if err := validatePackageNames(pkgs); err != nil {
+		return nil, err
 	}
 
 	switch opts.Blueprint.BaseDistro {
@@ -107,6 +116,16 @@ func uniqueStrings(in []string) []string {
 	return out
 }
 
+func validatePackageNames(pkgs []string) error {
+	for _, pkg := range pkgs {
+		pkg = strings.TrimSpace(pkg)
+		if !packageNamePattern.MatchString(pkg) || strings.HasPrefix(pkg, "-") {
+			return fmt.Errorf("%w: %q", ErrUnsafePackageName, pkg)
+		}
+	}
+	return nil
+}
+
 // InstallBaseSystem plans or runs bootstrap commands for the blueprint distro.
 func InstallBaseSystem(opts InstallOptions, runner CommandRunner) (InstallResult, error) {
 	steps, err := BuildBootstrapPlan(opts)
@@ -127,15 +146,83 @@ func InstallBaseSystem(opts InstallOptions, runner CommandRunner) (InstallResult
 		return InstallResult{}, ErrConfirmRequired
 	}
 
+	mount := strings.TrimSpace(opts.MountRoot)
+	mount = strings.TrimSuffix(mount, "/")
+
 	for _, step := range steps {
-		fields := strings.Fields(step)
-		if len(fields) == 0 {
-			continue
-		}
-		if err := runner.Run(fields[0], fields[1:]...); err != nil {
+		if err := runStep(step, mount, runner); err != nil {
 			return result, fmt.Errorf("execute: bootstrap failed on %q: %w", step, err)
 		}
 	}
 	result.Applied = true
 	return result, nil
+}
+
+func runStep(step string, mount string, runner CommandRunner) error {
+	fields := strings.Fields(step)
+	if len(fields) == 0 {
+		return nil
+	}
+
+	// 1. Handle genfstab specially because of stdout redirection
+	if fields[0] == "genfstab" {
+		out, err := runner.Output("genfstab", "-U", mount)
+		if err != nil {
+			return fmt.Errorf("genfstab failed: %w", err)
+		}
+		fstabPath := filepath.Join(mount, "etc", "fstab")
+		if err := os.MkdirAll(filepath.Dir(fstabPath), 0o755); err != nil {
+			return fmt.Errorf("mkdir fstab: %w", err)
+		}
+		f, err := os.OpenFile(fstabPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if err != nil {
+			return fmt.Errorf("open fstab: %w", err)
+		}
+		defer f.Close()
+		if _, err := f.Write(out); err != nil {
+			return fmt.Errorf("write fstab: %w", err)
+		}
+		return nil
+	}
+
+	// 2. Handle pacstrap specially to ensure package names are passed correctly
+	if fields[0] == "pacstrap" {
+		if len(fields) < 4 || fields[1] != "-c" || fields[2] != mount {
+			return fmt.Errorf("invalid pacstrap command: %q", step)
+		}
+		pkgs := fields[3:]
+		args := append([]string{"-c", mount}, pkgs...)
+		return runner.Run("pacstrap", args...)
+	}
+
+	// 3. Handle arch-chroot specially
+	if fields[0] == "arch-chroot" {
+		if len(fields) < 3 || fields[1] != mount {
+			return fmt.Errorf("invalid arch-chroot command: %q", step)
+		}
+		cmdArgs := fields[2:]
+		args := append([]string{mount}, cmdArgs...)
+		return runner.Run("arch-chroot", args...)
+	}
+
+	// 4. Handle debootstrap specially
+	if fields[0] == "debootstrap" {
+		if len(fields) < 5 || fields[3] != mount {
+			return fmt.Errorf("invalid debootstrap command: %q", step)
+		}
+		return runner.Run("debootstrap", fields[1:]...)
+	}
+
+	// 5. Handle chroot specially
+	if fields[0] == "chroot" {
+		if len(fields) < 3 || fields[1] != mount {
+			return fmt.Errorf("invalid chroot command: %q", step)
+		}
+		cmdArgs := fields[2:]
+		args := append([]string{mount}, cmdArgs...)
+		return runner.Run("chroot", args...)
+	}
+
+	// Fallback
+	return runner.Run(fields[0], fields[1:]...)
 }

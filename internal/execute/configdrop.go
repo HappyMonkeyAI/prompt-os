@@ -49,7 +49,10 @@ func buildConfigWrites(opts ConfigDropOptions) ([]configWrite, error) {
 		return nil, ErrEmptyConfigs
 	}
 
-	mount = filepath.Clean(mount)
+	mount, err := filepath.Abs(filepath.Clean(mount))
+	if err != nil {
+		return nil, err
+	}
 	absPaths := make([]string, 0, len(opts.Blueprint.Configs))
 	for absPath := range opts.Blueprint.Configs {
 		absPaths = append(absPaths, absPath)
@@ -69,6 +72,9 @@ func buildConfigWrites(opts ConfigDropOptions) ([]configWrite, error) {
 		if cleanHost != mount && !strings.HasPrefix(cleanHost, mount+string(os.PathSeparator)) {
 			return nil, llm.ErrUnsafePath
 		}
+		if err := rejectSymlinkPath(mount, cleanHost); err != nil {
+			return nil, err
+		}
 		writes = append(writes, configWrite{
 			AbsPath:  absPath,
 			HostPath: cleanHost,
@@ -76,6 +82,43 @@ func buildConfigWrites(opts ConfigDropOptions) ([]configWrite, error) {
 		})
 	}
 	return writes, nil
+}
+
+func rejectSymlinkPath(root, target string) error {
+	rootInfo, err := os.Lstat(root)
+	if err == nil && rootInfo.Mode()&os.ModeSymlink != 0 {
+		return llm.ErrUnsafePath
+	}
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	rel, err := filepath.Rel(root, target)
+	if err != nil {
+		return err
+	}
+	if rel == "." {
+		return nil
+	}
+	if strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || rel == ".." || filepath.IsAbs(rel) {
+		return llm.ErrUnsafePath
+	}
+
+	current := root
+	for _, part := range strings.Split(rel, string(os.PathSeparator)) {
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return llm.ErrUnsafePath
+		}
+	}
+	return nil
 }
 
 // BuildConfigDropPlan lists target file paths (host paths under MountRoot).
@@ -92,10 +135,14 @@ func BuildConfigDropPlan(opts ConfigDropOptions) ([]string, error) {
 }
 
 func validateConfigTarget(absPath string) error {
-	if strings.Contains(absPath, "..") || !filepath.IsAbs(absPath) {
+	if !filepath.IsAbs(absPath) {
 		return llm.ErrUnsafePath
 	}
-	if !strings.HasPrefix(absPath, "/etc/") && !strings.HasPrefix(absPath, "/opt/") {
+	cleanPath := filepath.Clean(absPath)
+	if cleanPath != absPath {
+		return llm.ErrUnsafePath
+	}
+	if !strings.HasPrefix(cleanPath, "/etc/") && !strings.HasPrefix(cleanPath, "/opt/") {
 		return llm.ErrUnsafePath
 	}
 	return nil

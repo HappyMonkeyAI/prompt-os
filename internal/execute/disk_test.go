@@ -10,6 +10,7 @@ import (
 
 type fakeRunner struct {
 	rootSource string
+	rootParent string
 	lsblk      string
 }
 
@@ -18,6 +19,9 @@ func (f fakeRunner) Output(name string, args ...string) ([]byte, error) {
 	case "findmnt":
 		return []byte(f.rootSource), nil
 	case "lsblk":
+		if len(args) >= 3 && args[0] == "-no" && args[1] == "PKNAME" {
+			return []byte(f.rootParent), nil
+		}
 		return []byte(f.lsblk), nil
 	default:
 		return nil, errors.New("unexpected command")
@@ -61,6 +65,14 @@ func TestNormalizeDeviceAcceptsWholeDisk(t *testing.T) {
 func TestValidateTargetDeviceRejectsRootDisk(t *testing.T) {
 	runner := fakeRunner{rootSource: "/dev/sda2", lsblk: "sda1 \n"}
 	err := ValidateTargetDevice("/dev/sda", runner)
+	if !errors.Is(err, ErrDeviceMounted) {
+		t.Fatalf("expected ErrDeviceMounted, got %v", err)
+	}
+}
+
+func TestValidateTargetDeviceRejectsRootParentDisk(t *testing.T) {
+	runner := fakeRunner{rootSource: "/dev/mapper/cryptroot", rootParent: "nvme0n1", lsblk: "nvme0n1 \n"}
+	err := ValidateTargetDevice("/dev/nvme0n1", runner)
 	if !errors.Is(err, ErrDeviceMounted) {
 		t.Fatalf("expected ErrDeviceMounted, got %v", err)
 	}

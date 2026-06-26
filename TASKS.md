@@ -9,18 +9,15 @@ For historical decisions, see `docs/decisions/`.
 
 ## Active / Next
 
-- [ ] Implement Foundation F1: Enhanced ADR + CONTEXT.md usage
-- [ ] Implement Foundation F3: File-based Decision & Memory Record system
-- [ ] Begin Phase 3: Execution Engine (after foundations complete)
-  - Task 3.1: Target disk preparation
-  - Task 3.2: Base system installation via chroot
+- [x] Task 3.1: Target disk preparation (`internal/execute/disk.go`, dry-run + guarded real-run)
+- [ ] Task 3.2: Base system installation via chroot
   - Task 3.3: Config & key drop
 
 ## Completed
 
 - [x] Phase 1: TUI Foundation (all tasks + code review fixes)
 - [x] Phase 2: LLM Orchestration (all tasks + code review fixes)
-- [x] Create `MANIFEST.md`
+- [x] Project Foundations F1–F3 (MANIFEST, TASKS, ADR 0003, docs/decisions/)
 - [x] Update main implementation plan with Project Foundations section
 
 ## Backlog / Future

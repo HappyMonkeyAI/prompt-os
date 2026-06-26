@@ -92,10 +92,14 @@ func BuildConfigDropPlan(opts ConfigDropOptions) ([]string, error) {
 }
 
 func validateConfigTarget(absPath string) error {
-	if strings.Contains(absPath, "..") || !filepath.IsAbs(absPath) {
+	if !filepath.IsAbs(absPath) {
 		return llm.ErrUnsafePath
 	}
-	if !strings.HasPrefix(absPath, "/etc/") && !strings.HasPrefix(absPath, "/opt/") {
+	cleanPath := filepath.Clean(absPath)
+	if cleanPath != absPath {
+		return llm.ErrUnsafePath
+	}
+	if !strings.HasPrefix(cleanPath, "/etc/") && !strings.HasPrefix(cleanPath, "/opt/") {
 		return llm.ErrUnsafePath
 	}
 	return nil

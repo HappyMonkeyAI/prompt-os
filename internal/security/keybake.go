@@ -85,16 +85,21 @@ func BakeSecret(root string, kind SecretKind, data []byte) (BakeResult, error) {
 		res.Backed = true
 	}
 
-	tmp := out + ".tmp-"
-	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, keyPerm)
+	f, err := os.CreateTemp(filepath.Dir(out), filepath.Base(out)+".tmp-*")
 	if err != nil {
 		return res, fmt.Errorf("create tmp: %w", err)
 	}
-	n, err := f.Write(data)
-	_ = f.Close()
-	if err != nil {
+	tmp := f.Name()
+
+	n, writeErr := f.Write(data)
+	closeErr := f.Close()
+	if writeErr != nil {
 		_ = os.Remove(tmp)
-		return res, fmt.Errorf("write tmp: %w", err)
+		return res, fmt.Errorf("write tmp: %w", writeErr)
+	}
+	if closeErr != nil {
+		_ = os.Remove(tmp)
+		return res, fmt.Errorf("close tmp: %w", closeErr)
 	}
 	if n != len(data) {
 		_ = os.Remove(tmp)

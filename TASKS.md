@@ -10,8 +10,8 @@ For historical decisions, see `docs/decisions/`.
 ## Active / Next
 
 - [x] Task 3.1: Target disk preparation (`internal/execute/disk.go`, dry-run + guarded real-run)
-- [ ] Task 3.2: Base system installation via chroot
-  - Task 3.3: Config & key drop
+- [x] Task 3.2: Base system installation via chroot (`internal/execute/bootstrap.go`)
+- [ ] Task 3.3: Config & key drop
 
 ## Completed
 

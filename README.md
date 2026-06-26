@@ -8,9 +8,9 @@ Instead of a static ISO or pre-baked distro, it acts as an intelligent orchestra
 
 **Core Idea (from initial concept transcript):** A "never the same twice" installer that keeps the maintenance burden on upstream package managers and LLMs, delivering a self-healing, voice-first, AI-ready desktop with baked-in provider credentials and an emergency triage agent.
 
-**Status:** Phase 2 (LLM Orchestration) complete and reviewed. All critical defects from code reviews resolved. Ready for Phase 3.
+**Status:** Phase 3 (Execution Engine) complete on `dev`. Disk prep, bootstrap plans, and config/key drop implemented in `internal/execute/`. Next: wire TUI → execute pipeline, then Phase 4 (security & triage).
 
-See `CONTEXT.md` for operating manual, `research/` for references, and `docs/adr/` for decisions.
+See `progress.md` (or `progress.Md`) for handoff details when resuming.
 
 ## Quick Start (Future)
 - Build or download minimal live ISO with TUI.

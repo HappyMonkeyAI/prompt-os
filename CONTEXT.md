@@ -22,7 +22,7 @@
 - Verification: All claims backed by research or live execution; no invented results.
 
 **Stack & Runtime (Initial)**
-- TUI: TBD (bubbletea/Go for static binary vs Textual/Python for rapid AI SDK integration). Research pending.
+- TUI: **Go + Bubble Tea** (static binary on minimal live ISO).
 - Execution: chroot, standard debootstrap/pacstrap + AI JSON blueprints for packages/drivers/configs.
 - Configs: systemd units, display managers (GDM/SDDM/LightDM), remote access (Open Cloud?), environment for keys.
 - Security: /etc/environment.d/ai-keys.conf or keyring; rescue target reroute for triage.

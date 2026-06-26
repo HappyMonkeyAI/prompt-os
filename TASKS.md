@@ -12,7 +12,7 @@ For historical decisions, see `docs/decisions/`.
 
 - [ ] Wire TUI: blueprint approval → execute pipeline (dry-run default)
 - [ ] Phase 4: Security & key baking hardening (`internal/security/`)
-- [ ] Phase 4: Emergency triage shell (rescue target stub)
+- [x] Task 4.2: Emergency triage shell (`internal/security/triage_agent.go` + stub shell)
 - [ ] Optional: PR `main` ← `dev` for Phase 3 milestone
 
 ## Completed

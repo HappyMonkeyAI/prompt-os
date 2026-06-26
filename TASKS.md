@@ -27,7 +27,7 @@ For historical decisions, see `docs/decisions/`.
 
 ## Backlog / Future
 
-- Custom "AI Linux Installer Builder" agent role (Phase 4+ consideration)
+- [ ] Custom "AI Linux Installer Builder" agent role (`internal/agent/`)
 - Integration with Article Research MCP for ongoing research
 - Advanced memory system (observational memory patterns)
 - Cancellation signals and improved error handling in TUI

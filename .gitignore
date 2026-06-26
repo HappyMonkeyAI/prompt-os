@@ -1,0 +1,7 @@
+# Build outputs
+.build-work/
+promptos
+promptos.exe
+promptos.test
+*~
+*.log

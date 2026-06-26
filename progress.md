@@ -18,7 +18,7 @@
 | Phase 2 — LLM orchestration | Done | `internal/llm/`, blueprint TUI; PR #3 fixes merged on `dev` |
 | **Phase 3 — Execution engine** | **Done** | `internal/execute/` disk + bootstrap + config drop |
 | **Phase 4 — Security & triage** | **Done** | Key baking hardening, triage shell in `internal/security/` |
-| **Phase 5 — Bootable ISO** | **Partial** | Minimal live ISO artifacts created; full boot validation still open |
+| **Phase 5 — Bootable ISO** | **Done** | Bootable MBR-partitioned image with GRUB and linux-virt kernel |
 
 **Current status:** `dev` has a stable Phase 3/4 checkpoint. `main` was last advanced by PR #7 (`f5736caa`).
 

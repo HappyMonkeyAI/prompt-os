@@ -22,13 +22,13 @@ For historical decisions, see `docs/decisions/`.
 - [x] Task 5.1: Minimal live ISO build artifacts (`build/`)
 - [x] Task 5.2: End-to-end VM test
 - [x] Feature: AI Linux Installer Builder agent role (`internal/agent/installer_builder.go`)
+- [x] Phase 5: Bootable Alpine live ISO follow-on
 
 ## Backlog / Future
 
 - [ ] Phase 3: Execution Engine follow-up
 - [ ] Advanced memory system (observational memory patterns)
 - [ ] Cancellation signals and improved error handling in TUI
-- [ ] Phase 5: Bootable Alpine live ISO follow-on
 
 ---
 

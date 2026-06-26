@@ -14,7 +14,7 @@ For historical decisions, see `docs/decisions/`.
 - [x] Phase 4: Security & key baking hardening (`internal/security/`)
 - [x] Task 4.2: Emergency triage shell (`internal/security/triage_agent.go` + stub shell)
 - [x] Task 5.1: Minimal live ISO build artifacts (`build/`)
-- [ ] Task 5.2: End-to-end VM test
+- [x] Task 5.2: End-to-end VM test
 - [ ] Optional: PR `main` ← `dev` for Phase 3/4 milestone
 
 ## Completed

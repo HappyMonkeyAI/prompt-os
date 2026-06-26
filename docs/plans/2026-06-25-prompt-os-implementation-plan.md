@@ -195,3 +195,5 @@
 - Revisit this plan after Phase 0 research completes.
 
 **Next after this plan is written:** Proceed to Task 0.1 (Phase 0 research).
+## Task 5.2 command
+Runs the VM test helper script to verify end-to-end behavior.

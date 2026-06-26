@@ -14,6 +14,7 @@ var (
 	ErrEmptyKey       = errors.New("security: key is empty")
 	ErrUnsupportedExt = errors.New("security: unsupported secret extension")
 	ErrBackupFailed   = errors.New("security: backup failed")
+	ErrUnsafePath     = errors.New("security: unsafe secret path")
 )
 
 const keyPerm = 0o600
@@ -61,7 +62,13 @@ func BakeSecret(root string, kind SecretKind, data []byte) (BakeResult, error) {
 		return BakeResult{}, err
 	}
 	out := filepath.Join(root, dest)
+	if err := rejectSymlinkPath(root, out); err != nil {
+		return BakeResult{}, err
+	}
 	if err := mkdirp(filepath.Dir(out)); err != nil {
+		return BakeResult{}, err
+	}
+	if err := rejectSymlinkPath(root, out); err != nil {
 		return BakeResult{}, err
 	}
 
@@ -113,6 +120,51 @@ func BakeSecret(root string, kind SecretKind, data []byte) (BakeResult, error) {
 	res.Path = out
 	res.Written = true
 	return res, nil
+}
+
+func rejectSymlinkPath(root, target string) error {
+	root, err := filepath.Abs(filepath.Clean(root))
+	if err != nil {
+		return err
+	}
+	rootInfo, err := os.Lstat(root)
+	if err == nil && rootInfo.Mode()&os.ModeSymlink != 0 {
+		return ErrUnsafePath
+	}
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	target, err = filepath.Abs(filepath.Clean(target))
+	if err != nil {
+		return err
+	}
+	rel, err := filepath.Rel(root, target)
+	if err != nil {
+		return err
+	}
+	if rel == "." {
+		return nil
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || filepath.IsAbs(rel) {
+		return ErrUnsafePath
+	}
+
+	current := root
+	for _, part := range strings.Split(rel, string(os.PathSeparator)) {
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return ErrUnsafePath
+		}
+	}
+	return nil
 }
 
 func mkdirp(p string) error {

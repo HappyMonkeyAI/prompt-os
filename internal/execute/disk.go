@@ -15,6 +15,7 @@ var (
 	ErrDeviceMounted   = errors.New("execute: refusing to prepare a mounted device")
 	ErrConfirmRequired = errors.New("execute: real disk preparation requires ConfirmWipe")
 	ErrEmptyDevice     = errors.New("execute: device is required")
+	ErrRootDiskUnknown = errors.New("execute: cannot verify root disk")
 )
 
 // wholeDiskPattern matches common Linux whole-disk nodes (not partitions).
@@ -85,11 +86,22 @@ func ValidateTargetDevice(device string, runner CommandRunner) error {
 	}
 
 	mounts, err := runner.Output("findmnt", "-n", "-o", "SOURCE", "--target", "/")
-	if err == nil {
-		rootSource := strings.TrimSpace(string(mounts))
-		if rootSource != "" && sameDisk(normalized, rootSource) {
-			return fmt.Errorf("%w: %s is hosting /", ErrDeviceMounted, normalized)
-		}
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrRootDiskUnknown, err)
+	}
+	rootSource := strings.TrimSpace(string(mounts))
+	if rootSource == "" {
+		return ErrRootDiskUnknown
+	}
+	if sameDisk(normalized, rootSource) {
+		return fmt.Errorf("%w: %s is hosting /", ErrDeviceMounted, normalized)
+	}
+	rootDisk, err := parentDisk(rootSource, runner)
+	if err != nil {
+		return err
+	}
+	if rootDisk != "" && sameDisk(normalized, rootDisk) {
+		return fmt.Errorf("%w: %s is hosting /", ErrDeviceMounted, normalized)
 	}
 
 	out, err := runner.Output("lsblk", "-ln", "-o", "NAME,MOUNTPOINT", normalized)
@@ -112,6 +124,21 @@ func ValidateTargetDevice(device string, runner CommandRunner) error {
 	}
 
 	return nil
+}
+
+func parentDisk(device string, runner CommandRunner) (string, error) {
+	out, err := runner.Output("lsblk", "-no", "PKNAME", device)
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", ErrRootDiskUnknown, err)
+	}
+	parent := strings.TrimSpace(string(out))
+	if parent == "" {
+		return "", nil
+	}
+	if strings.HasPrefix(parent, "/dev/") {
+		return parent, nil
+	}
+	return filepath.Join("/dev", parent), nil
 }
 
 func sameDisk(whole, partOrWhole string) bool {

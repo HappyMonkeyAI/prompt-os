@@ -37,6 +37,23 @@ func TestApplyConfigDropRejectsUnsafePath(t *testing.T) {
 	}
 }
 
+func TestApplyConfigDropRejectsSymlinkTarget(t *testing.T) {
+	mount := t.TempDir()
+	targetDir := filepath.Join(mount, "etc")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatalf("setup mkdir failed: %v", err)
+	}
+	if err := os.Symlink("/tmp/outside", filepath.Join(targetDir, "foo.conf")); err != nil {
+		t.Fatalf("setup symlink failed: %v", err)
+	}
+
+	bp := &llm.Blueprint{Configs: map[string]string{"/etc/foo.conf": "x"}}
+	_, err := ApplyConfigDrop(ConfigDropOptions{Blueprint: bp, MountRoot: mount, Confirm: true})
+	if !errors.Is(err, llm.ErrUnsafePath) {
+		t.Fatalf("expected ErrUnsafePath, got %v", err)
+	}
+}
+
 func TestApplyConfigDropWritesFiles(t *testing.T) {
 	dir := t.TempDir()
 	mount := filepath.Join(dir, "target")

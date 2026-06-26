@@ -1,6 +1,7 @@
 package security
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,6 +55,22 @@ func TestBakeSecretBacksUpExisting(t *testing.T) {
 	}
 	if _, err := os.Stat(res.Backup); err != nil {
 		t.Fatalf("backup missing: %v", err)
+	}
+}
+
+func TestBakeSecretRejectsSymlinkTarget(t *testing.T) {
+	root := t.TempDir()
+	dest := filepath.Join(root, "etc", "environment.d", "ai-keys.conf")
+	if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
+		t.Fatalf("setup mkdir failed: %v", err)
+	}
+	if err := os.Symlink("/tmp/outside", dest); err != nil {
+		t.Fatalf("setup symlink failed: %v", err)
+	}
+
+	_, err := BakeSecret(root, SecretKindAPIKey, []byte("OPENAI_API_KEY=sk-test"))
+	if !errors.Is(err, ErrUnsafePath) {
+		t.Fatalf("expected ErrUnsafePath, got %v", err)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/HappyMonkeyAI/prompt-os/internal/llm"
@@ -13,7 +14,10 @@ import (
 var (
 	ErrUnsupportedDistro = errors.New("execute: unsupported base_distro for bootstrap")
 	ErrEmptyMountRoot    = errors.New("execute: mount root is required")
+	ErrUnsafePackageName = errors.New("execute: unsafe package name")
 )
+
+var packageNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+._:@-]*$`)
 
 // InstallOptions controls base system installation into a prepared chroot.
 type InstallOptions struct {
@@ -47,6 +51,9 @@ func BuildBootstrapPlan(opts InstallOptions) ([]string, error) {
 	pkgs := append([]string(nil), opts.Blueprint.Packages...)
 	if len(pkgs) == 0 {
 		pkgs = defaultPackages(opts.Blueprint.BaseDistro)
+	}
+	if err := validatePackageNames(pkgs); err != nil {
+		return nil, err
 	}
 
 	switch opts.Blueprint.BaseDistro {
@@ -107,6 +114,16 @@ func uniqueStrings(in []string) []string {
 		out = append(out, s)
 	}
 	return out
+}
+
+func validatePackageNames(pkgs []string) error {
+	for _, pkg := range pkgs {
+		pkg = strings.TrimSpace(pkg)
+		if !packageNamePattern.MatchString(pkg) || strings.HasPrefix(pkg, "-") {
+			return fmt.Errorf("%w: %q", ErrUnsafePackageName, pkg)
+		}
+	}
+	return nil
 }
 
 // InstallBaseSystem plans or runs bootstrap commands for the blueprint distro.

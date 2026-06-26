@@ -41,6 +41,14 @@ func TestBuildBootstrapPlanRejectsUnknownDistro(t *testing.T) {
 	}
 }
 
+func TestBuildBootstrapPlanRejectsUnsafePackageName(t *testing.T) {
+	bp := &llm.Blueprint{BaseDistro: "arch", Packages: []string{"htop", "--config"}}
+	_, err := BuildBootstrapPlan(InstallOptions{Blueprint: bp, MountRoot: "/mnt"})
+	if !errors.Is(err, ErrUnsafePackageName) {
+		t.Fatalf("expected ErrUnsafePackageName, got %v", err)
+	}
+}
+
 func TestInstallBaseSystemDryRun(t *testing.T) {
 	bp := &llm.Blueprint{BaseDistro: "ubuntu", StabilityPreference: "stable"}
 	runner := fakeRunner{}

@@ -1,7 +1,8 @@
 # PromptOS Task List
 
 This file tracks active and upcoming work items.  
-For historical decisions, see `docs/decisions/`.
+For historical decisions, see `docs/decisions/`.  
+**Handoff:** see `progress.md` / `progress.Md`.
 
 **Last Updated:** 2026-06-26
 
@@ -9,12 +10,14 @@ For historical decisions, see `docs/decisions/`.
 
 ## Active / Next
 
-- [x] Task 3.1: Target disk preparation (`internal/execute/disk.go`, dry-run + guarded real-run)
-- [x] Task 3.2: Base system installation via chroot (`internal/execute/bootstrap.go`)
-- [x] Task 3.3: Config & key drop (`internal/execute/configdrop.go`)
+- [ ] Wire TUI: blueprint approval → execute pipeline (dry-run default)
+- [ ] Phase 4: Security & key baking hardening (`internal/security/`)
+- [ ] Phase 4: Emergency triage shell (rescue target stub)
+- [ ] Optional: PR `main` ← `dev` for Phase 3 milestone
 
 ## Completed
 
+- [x] Phase 3: Execution Engine (3.1 disk, 3.2 bootstrap, 3.3 config drop)
 - [x] Phase 1: TUI Foundation (all tasks + code review fixes)
 - [x] Phase 2: LLM Orchestration (all tasks + code review fixes)
 - [x] Project Foundations F1–F3 (MANIFEST, TASKS, ADR 0003, docs/decisions/)
@@ -26,6 +29,7 @@ For historical decisions, see `docs/decisions/`.
 - Integration with Article Research MCP for ongoing research
 - Advanced memory system (observational memory patterns)
 - Cancellation signals and improved error handling in TUI
+- Phase 5: Bootable Alpine live ISO
 
 ---
 

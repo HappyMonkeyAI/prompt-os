@@ -1,6 +1,6 @@
 # PromptOS Progress Handoff
 
-> **Resume file** — update this when pausing work. (Same content as `progress.Md` if you use that name locally.)
+> **Resume file** — update this when pausing work. (Canonical copy: `progress.md` on case-sensitive filesystems.)
 
 **Last updated:** 2026-06-26  
 **Branch:** `dev`  
@@ -55,16 +55,12 @@ f97c29f docs: update main implementation plan with Project Foundations section
 
 ## Verification (local, ad-hoc)
 
-From repo root (Go on `PATH`):
-
 ```bash
 export PATH=$HOME/go/bin:$PATH
 cd ~/projects/prompt-os
 go test ./internal/execute/... -count=1
 go build ./...
 ```
-
-No project-wide CI config yet — treat the above as the current smoke check.
 
 ---
 
@@ -74,7 +70,7 @@ No project-wide CI config yet — treat the above as the current smoke check.
 - `CONTEXT.md` — operating rules & stack
 - `MANIFEST.md` — scope in/out
 - `TASKS.md` — active/completed tasks
-- `docs/plans/2026-06-25-prompt-os-implementation-plan.md` — full roadmap (incl. foundations)
+- `docs/plans/2026-06-25-prompt-os-implementation-plan.md` — full roadmap
 - `docs/blueprint-schema.md` — JSON contract
 - `docs/adr/` — ADR 0001–0003
 - `docs/decisions/` — dated decision records
@@ -83,20 +79,17 @@ No project-wide CI config yet — treat the above as the current smoke check.
 
 ## Pick up tomorrow — suggested order
 
-1. **Wire execution pipeline in TUI** — after blueprint approval: choose target disk → dry-run plan → user confirm → bootstrap → config drop (still safe defaults).
-2. **Phase 4** — `internal/security/` key baking review, emergency triage shell stub.
-3. **Open/update PR** — `main` ← `dev` when you want a merge checkpoint (Phase 3 milestone).
-4. **Optional** — refresh `CONTEXT.md` stack line (TUI is Bubble Tea, not TBD).
+1. Wire execution pipeline in TUI (dry-run first).
+2. Phase 4 — security / emergency triage.
+3. PR merge checkpoint for Phase 3 on `dev`.
+4. Optional: refresh `CONTEXT.md` (TUI = Bubble Tea).
 
 ---
 
 ## Environment reminders
 
-- Project path: `~/projects/prompt-os`
-- `go` may need: `export PATH=$HOME/go/bin:$PATH`
-- API keys: collected in TUI only; never commit real keys
-- PR history: Phase 2 was **PR #3**; Phase 3 work is on `dev` after that line
+- Project: `~/projects/prompt-os`
+- `export PATH=$HOME/go/bin:$PATH` if `go` missing
+- Do not commit real API keys
 
----
-
-**Handoff complete.** Start with `TASKS.md` and this file when resuming.
+**Handoff complete.**

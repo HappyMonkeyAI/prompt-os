@@ -2,7 +2,7 @@
 
 **Project:** PromptOS – AI-First Dynamic Linux Bootstrap Framework
 
-**Version:** 0.2 (2026-06-26)
+**Version:** 0.3 (2026-06-26)
 
 ---
 
@@ -31,11 +31,11 @@ PromptOS is a minimal, TUI-driven installer that uses live LLM calls to generate
 
 | Component              | Location                        | Status     |
 |------------------------|----------------------------------|------------|
-| TUI Framework          | `cmd/promptos/`, `internal/tui/` | Phase 1    |
-| LLM Abstraction        | `internal/llm/`                  | Phase 2    |
-| Blueprint Schema       | `docs/blueprint-schema.md`       | Phase 0    |
-| Hardware Scanner       | `internal/hardware/`             | Phase 1    |
-| Execution Engine       | `internal/execute/`              | Phase 3    |
+| TUI Framework          | `cmd/promptos/`, `internal/tui/` | Complete   |
+| LLM Abstraction        | `internal/llm/`                  | Complete   |
+| Blueprint Schema       | `docs/blueprint-schema.md`       | Complete   |
+| Hardware Scanner       | `internal/hardware/`             | Complete   |
+| Execution Engine       | `internal/execute/`              | Complete   |
 | Security & Key Baking  | `internal/security/`             | Phase 4    |
 | Live ISO Build         | `build/`                         | Phase 5    |
 

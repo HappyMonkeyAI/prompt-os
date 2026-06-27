@@ -83,68 +83,101 @@ func NewProviderModel() ProviderModel {
 func (m ProviderModel) Init() tea.Cmd { return textinput.Blink }
 
 func (m ProviderModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if !ok || m.done {
+		return m, nil
+	}
+	if m.providerName == "" {
+		return m.updateProviderSelection(keyMsg)
+	}
+	return m.updateProviderConfig(keyMsg)
+}
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		// ── Phase 1: provider list ──────────────────────────────────────────
-		if m.providerName == "" {
-			switch msg.String() {
-			case "up", "k":
-				if m.selected > 0 {
-					m.selected--
-				}
-			case "down", "j":
-				if m.selected < len(m.providers)-1 {
-					m.selected++
-				}
-			case "enter":
-				m.providerName = m.providers[m.selected]
-				m.prompts = promptsForProvider(m.providerName)
-				m.promptIndex = 0
-				m.values = make(map[string]string)
-				m.setupInput(0)
-				return m, textinput.Blink
-			case "q", "ctrl+c":
-				return m, tea.Quit
-			}
-			return m, cmd
+func (m ProviderModel) updateProviderSelection(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		if m.selected > 0 {
+			m.selected--
 		}
-
-		// ── Phase 2: per-provider config prompts ────────────────────────────
-		switch msg.String() {
-		case "ctrl+c":
-			return m, tea.Quit
-		case "enter":
-			val := m.input.Value()
-			if val == "" {
-				// Use the default if the user pressed Enter on an empty field
-				val = m.prompts[m.promptIndex].dflt
-			}
-			m.values[m.prompts[m.promptIndex].key] = val
-			m.promptIndex++
-
-			if m.promptIndex >= len(m.prompts) {
-				// Mark done before emitting — prevents View() panic while Bubble Tea drains events
-				m.done = true
-				return m, func() tea.Msg {
-					return ProviderDoneMsg{
-						Provider: m.providerName,
-						APIKey:   m.values["api_key"],
-						BaseURL:  m.values["base_url"],
-						Model:    m.values["model"],
-					}
-				}
-			}
-			m.setupInput(m.promptIndex)
-			return m, textinput.Blink
+	case "down", "j":
+		if m.selected < len(m.providers)-1 {
+			m.selected++
 		}
+	case "enter":
+		return m.selectProvider()
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	}
+	return m, nil
+}
 
-		m.input, cmd = m.input.Update(msg)
-		return m, cmd
+func (m ProviderModel) selectProvider() (tea.Model, tea.Cmd) {
+	if m.selected < 0 || m.selected >= len(m.providers) {
+		return m, nil
+	}
+	m.providerName = m.providers[m.selected]
+	m.prompts = promptsForProvider(m.providerName)
+	m.promptIndex = 0
+	m.values = make(map[string]string)
+	if len(m.prompts) == 0 {
+		m.done = true
+		return m, m.providerDoneCmd()
+	}
+	m.setupInput(0)
+	return m, textinput.Blink
+}
+
+func (m ProviderModel) updateProviderConfig(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c":
+		return m, tea.Quit
+	case "enter":
+		return m.confirmPrompt()
 	}
 
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
 	return m, cmd
+}
+
+func (m ProviderModel) confirmPrompt() (tea.Model, tea.Cmd) {
+	prompt, ok := m.currentPrompt()
+	if !ok {
+		m.done = true
+		return m, m.providerDoneCmd()
+	}
+
+	val := m.input.Value()
+	if val == "" {
+		val = prompt.dflt
+	}
+	m.values[prompt.key] = val
+	m.promptIndex++
+
+	if m.promptIndex >= len(m.prompts) {
+		m.done = true
+		return m, m.providerDoneCmd()
+	}
+	m.setupInput(m.promptIndex)
+	return m, textinput.Blink
+}
+
+func (m ProviderModel) currentPrompt() (configPrompt, bool) {
+	if m.promptIndex < 0 || m.promptIndex >= len(m.prompts) {
+		return configPrompt{}, false
+	}
+	return m.prompts[m.promptIndex], true
+}
+
+func (m ProviderModel) providerDoneCmd() tea.Cmd {
+	return func() tea.Msg {
+		return ProviderDoneMsg{
+			Provider: m.providerName,
+			APIKey:   m.values["api_key"],
+			BaseURL:  m.values["base_url"],
+			Model:    m.values["model"],
+		}
+	}
 }
 
 func (m *ProviderModel) setupInput(idx int) {
@@ -233,4 +266,6 @@ func (m ProviderModel) ValidateKey(k string) bool {
 }
 
 // SetProvider is kept for backward compatibility (no-op; use WithProvider).
-func (m ProviderModel) SetProvider(_ string) {}
+func (m ProviderModel) SetProvider(_ string) {
+	// Intentionally empty: this value-receiver method cannot mutate the caller.
+}

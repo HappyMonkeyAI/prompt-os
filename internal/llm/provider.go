@@ -205,7 +205,9 @@ func openAIChat(ctx context.Context, url, apiKey, model, referer, prompt string)
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	if apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
 	if referer != "" {
 		req.Header.Set("HTTP-Referer", referer)
 	}

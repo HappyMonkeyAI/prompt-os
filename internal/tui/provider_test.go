@@ -40,3 +40,28 @@ func TestProviderKeyValidation(t *testing.T) {
 		t.Error("expected input to capture runes during config prompt")
 	}
 }
+
+func TestProviderConfigEnterWithOutOfRangePromptCompletes(t *testing.T) {
+	m := NewProviderModel().WithProvider("openai")
+	m.prompts = promptsForProvider("openai")
+	m.values = make(map[string]string)
+	m.promptIndex = len(m.prompts)
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	pm := updated.(ProviderModel)
+	if !pm.done {
+		t.Fatal("expected model to be marked done")
+	}
+	if cmd == nil {
+		t.Fatal("expected ProviderDoneMsg command")
+	}
+
+	msg := cmd()
+	doneMsg, ok := msg.(ProviderDoneMsg)
+	if !ok {
+		t.Fatalf("expected ProviderDoneMsg, got %T", msg)
+	}
+	if doneMsg.Provider != "openai" {
+		t.Fatalf("Provider = %q, want openai", doneMsg.Provider)
+	}
+}

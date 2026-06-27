@@ -11,7 +11,7 @@ QEMU_ARGS="${QEMU_ARGS:-}"
 MEM_MB="${MEM_MB:-1024}"
 DISK_GB="${DISK_GB:-3}"
 
-if [ ! -f "${IMAGE_PATH}" ]; then
+if [[ ! -f "${IMAGE_PATH}" ]]; then
   echo "Missing image: ${IMAGE_PATH}"
   exit 1
 fi

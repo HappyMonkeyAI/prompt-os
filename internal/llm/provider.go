@@ -61,7 +61,7 @@ func (c *OpenAIClient) Generate(ctx context.Context, prompt string) (string, err
 		"display": {"server": "wayland", "manager": "sddm"},
 		"packages": ["base", "linux", "linux-firmware"],
 		"drivers": {"gpu": "intel", "extra": []},
-		"configs": {"/etc/environment.d/ai-keys.conf": "OPENAI_API_KEY=sk-..."},
+		"configs": {"/etc/environment.d/ai-keys.conf": ""},
 		"services": {"enable": ["NetworkManager"], "disable": []},
 		"remote_access": {"enabled": false, "method": ""}
 	}`), nil
@@ -101,7 +101,7 @@ func (c *OllamaClient) Generate(ctx context.Context, prompt string) (string, err
 		"display": {"server": "wayland", "manager": "sddm"},
 		"packages": ["base", "linux", "linux-firmware"],
 		"drivers": {"gpu": "intel", "extra": []},
-		"configs": {"/etc/environment.d/ai-keys.conf": "OPENAI_API_KEY=sk-..."},
+		"configs": {"/etc/environment.d/ai-keys.conf": ""},
 		"services": {"enable": ["NetworkManager"], "disable": []},
 		"remote_access": {"enabled": false, "method": ""}
 	}`), nil

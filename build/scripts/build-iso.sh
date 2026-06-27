@@ -23,7 +23,7 @@ cleanup() {
   umount "${WORK_DIR}/mnt/proc" 2>/dev/null || true
   umount "${WORK_DIR}/mnt/sys" 2>/dev/null || true
   umount "${WORK_DIR}/mnt" 2>/dev/null || true
-  if [ -n "${LOOP_DEV}" ]; then
+  if [[ -n "${LOOP_DEV}" ]]; then
     losetup -d "${LOOP_DEV}" 2>/dev/null || true
   fi
 }
@@ -34,7 +34,7 @@ mkdir -p "${WORK_DIR}"
 
 # ----- CLEAN: remove stale image and VMDK to prevent dirty rebuild -----
 echo "==> cleaning stale build artifacts"
-if [ -f "${IMAGE_PATH}" ]; then
+if [[ -f "${IMAGE_PATH}" ]]; then
   echo "    removing stale image: ${IMAGE_PATH}"
   # Detach any loop devices still associated with the old image
   for dev in $(losetup -j "${IMAGE_PATH}" | cut -d: -f1); do
@@ -43,7 +43,7 @@ if [ -f "${IMAGE_PATH}" ]; then
   done
   rm -f "${IMAGE_PATH}"
 fi
-if [ -f "${VMDK_PATH}" ]; then
+if [[ -f "${VMDK_PATH}" ]]; then
   echo "    removing stale VMDK: ${VMDK_PATH}"
   rm -f "${VMDK_PATH}"
 fi
@@ -71,23 +71,23 @@ echo "==> mount and format partition"
 LOOP_DEV="$(losetup -P --show -f "${IMAGE_PATH}")"
 sleep 1
 PART_DEV="${LOOP_DEV}p1"
-if [ ! -b "${PART_DEV}" ] && [ -b "${LOOP_DEV}1" ]; then
+if [[ ! -b "${PART_DEV}" && -b "${LOOP_DEV}1" ]]; then
   PART_DEV="${LOOP_DEV}1"
 fi
-if [ ! -b "${PART_DEV}" ]; then
+if [[ ! -b "${PART_DEV}" ]]; then
   echo "Waiting for partition block device to appear..."
   for i in {1..5}; do
-    if [ -b "${LOOP_DEV}p1" ]; then
+    if [[ -b "${LOOP_DEV}p1" ]]; then
       PART_DEV="${LOOP_DEV}p1"
       break
-    elif [ -b "${LOOP_DEV}1" ]; then
+    elif [[ -b "${LOOP_DEV}1" ]]; then
       PART_DEV="${LOOP_DEV}1"
       break
     fi
     sleep 1
   done
 fi
-if [ ! -b "${PART_DEV}" ]; then
+if [[ ! -b "${PART_DEV}" ]]; then
   echo "Error: partition device not found for ${LOOP_DEV}" >&2
   exit 1
 fi
@@ -120,7 +120,7 @@ printf '%s\n' \
 chroot "${WORK_DIR}/mnt" /bin/sh -lc '/usr/sbin/apk.static add --no-cache bash util-linux linux-virt grub-bios openrc eudev open-vm-tools'
 
 echo "==> retry base packages if transient fetch failed"
-if ! chroot "${WORK_DIR}/mnt" /bin/sh -lc '[ -x /usr/bin/bash ] && [ -x /bin/fdisk ]'; then
+if ! chroot "${WORK_DIR}/mnt" /bin/bash -lc '[[ -x /usr/bin/bash && -x /bin/fdisk ]]'; then
   sleep 3
   chroot "${WORK_DIR}/mnt" /bin/sh -lc '/usr/sbin/apk.static add --no-cache bash util-linux linux-virt grub-bios openrc eudev open-vm-tools' || true
 fi
@@ -134,17 +134,17 @@ chroot "${WORK_DIR}/mnt" /bin/sh -lc 'bash --version >/dev/null && fdisk --versi
 echo "==> copy PromptOS binary"
 mkdir -p "${WORK_DIR}/mnt/usr/local/bin"
 
-if [ -f "${PROMPTOS_BIN_SRC}" ]; then
+if [[ -f "${PROMPTOS_BIN_SRC}" ]]; then
   echo "Using pre-built binary: ${PROMPTOS_BIN_SRC}"
   cp "${PROMPTOS_BIN_SRC}" "${WORK_DIR}/mnt/usr/local/bin/promptos"
-elif [ -d "${PROMPTOS_BIN_SRC}" ]; then
+elif [[ -d "${PROMPTOS_BIN_SRC}" ]]; then
   GO_BIN="go"
   if ! command -v go >/dev/null 2>&1; then
-    if [ -x "/usr/local/go/bin/go" ]; then
+    if [[ -x "/usr/local/go/bin/go" ]]; then
       GO_BIN="/usr/local/go/bin/go"
-    elif [ -n "${SUDO_USER:-}" ] && [ -x "/home/${SUDO_USER}/go/bin/go" ]; then
+    elif [[ -n "${SUDO_USER:-}" && -x "/home/${SUDO_USER}/go/bin/go" ]]; then
       GO_BIN="/home/${SUDO_USER}/go/bin/go"
-    elif [ -f "${REPO_ROOT}/promptos" ]; then
+    elif [[ -f "${REPO_ROOT}/promptos" ]]; then
       echo "go not found, but found pre-built binary at repo root: ${REPO_ROOT}/promptos"
       cp "${REPO_ROOT}/promptos" "${WORK_DIR}/mnt/usr/local/bin/promptos"
       GO_BIN=""
@@ -155,7 +155,7 @@ elif [ -d "${PROMPTOS_BIN_SRC}" ]; then
     fi
   fi
 
-  if [ -n "${GO_BIN}" ]; then
+  if [[ -n "${GO_BIN}" ]]; then
     echo "Building PromptOS binary using ${GO_BIN} (static, musl-compatible)..."
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 "${GO_BIN}" build \
       -ldflags="-extldflags=-static" \
@@ -163,7 +163,7 @@ elif [ -d "${PROMPTOS_BIN_SRC}" ]; then
       "${PROMPTOS_BIN_SRC}"
   fi
 else
-  if [ -f "${REPO_ROOT}/promptos" ]; then
+  if [[ -f "${REPO_ROOT}/promptos" ]]; then
     echo "Source not found or invalid, falling back to pre-built binary: ${REPO_ROOT}/promptos"
     cp "${REPO_ROOT}/promptos" "${WORK_DIR}/mnt/usr/local/bin/promptos"
   else

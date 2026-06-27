@@ -16,7 +16,7 @@ type ProviderModel struct {
 
 func NewProviderModel() ProviderModel {
 	ti := textinput.New()
-	ti.Placeholder = "sk-..."
+	ti.Placeholder = "API key"
 	ti.Focus()
 	ti.CharLimit = 128
 	ti.Width = 40

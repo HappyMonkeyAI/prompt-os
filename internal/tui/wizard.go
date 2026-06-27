@@ -1,23 +1,72 @@
 package tui
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 )
 
+// WizardDoneMsg is emitted when the user completes all wizard steps.
+type WizardDoneMsg struct {
+	Answers map[string]string
+}
+
+// wizardStep describes a single step in the wizard.
+type wizardStep struct {
+	key         string
+	title       string
+	subtitle    string
+	choices     []string // nil → free-text input
+	placeholder string   // used when choices == nil
+}
+
+var wizardSteps = []wizardStep{
+	{
+		key:         "use_case",
+		title:       "What do you want this system for?",
+		subtitle:    "Describe it in your own words",
+		placeholder: "e.g. gaming PC, dev workstation, home media server, privacy-focused laptop…",
+	},
+	{
+		key:      "base_distro",
+		title:    "Base distribution",
+		subtitle: "Choose the Linux base to build on",
+		choices:  []string{"arch", "ubuntu", "debian"},
+	},
+	{
+		key:      "stability",
+		title:    "Stability preference",
+		subtitle: "How cutting-edge do you want the packages?",
+		choices:  []string{"stable  (recommended)", "bleeding  (latest everything)"},
+	},
+	{
+		key:      "display",
+		title:    "Display server",
+		subtitle: "How should the desktop render graphics?",
+		choices:  []string{"wayland  (modern, default)", "x11  (legacy, wider compat)", "none  (headless / server)"},
+	},
+	{
+		key:      "gpu",
+		title:    "GPU / graphics driver",
+		subtitle: "Which GPU does this machine have?",
+		choices:  []string{"nvidia", "amd", "intel", "none / virtual"},
+	},
+}
+
+// WizardModel walks the user through OS preference questions.
 type WizardModel struct {
-	step     int
-	answers  map[string]string
-	input    textinput.Model
-	choices  []string
+	step    int
+	answers map[string]string
+	input   textinput.Model
 	selected int
 }
 
 func NewWizardModel() WizardModel {
 	ti := textinput.New()
-	ti.Focus()
-	ti.Width = 50
+	ti.Width = 60
+	ti.CharLimit = 256
 
 	m := WizardModel{
 		step:    0,
@@ -32,101 +81,112 @@ func (m WizardModel) Init() tea.Cmd { return textinput.Blink }
 
 func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+	step := wizardSteps[m.step]
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "ctrl+c", "q":
+			return m, tea.Quit
+
 		case "enter":
-			if len(m.choices) > 0 {
-				m.answers[m.currentKey()] = m.choices[m.selected]
+			// Capture the answer for this step
+			if len(step.choices) > 0 {
+				// Strip the annotation after two spaces (e.g. "stable  (recommended)" → "stable")
+				raw := step.choices[m.selected]
+				if idx := strings.Index(raw, "  "); idx >= 0 {
+					raw = raw[:idx]
+				}
+				m.answers[step.key] = raw
 			} else {
-				m.answers[m.currentKey()] = m.input.Value()
+				val := strings.TrimSpace(m.input.Value())
+				if val == "" {
+					return m, nil // require non-empty for free-text
+				}
+				m.answers[step.key] = val
 			}
+
 			m.step++
-			if m.step > 3 {
-				return m, tea.Quit
+			if m.step >= len(wizardSteps) {
+				answers := make(map[string]string, len(m.answers))
+				for k, v := range m.answers {
+					answers[k] = v
+				}
+				return m, func() tea.Msg { return WizardDoneMsg{Answers: answers} }
 			}
 			m.resetForStep(m.step)
+			return m, textinput.Blink
+
 		case "up", "k":
-			if m.selected > 0 {
+			if len(step.choices) > 0 && m.selected > 0 {
 				m.selected--
 			}
 		case "down", "j":
-			if m.selected < len(m.choices)-1 {
+			if len(step.choices) > 0 && m.selected < len(step.choices)-1 {
 				m.selected++
 			}
-		case "q", "ctrl+c":
-			return m, tea.Quit
 		}
 	}
 
-	if len(m.choices) == 0 {
+	if len(wizardSteps[m.step].choices) == 0 {
 		m.input, cmd = m.input.Update(msg)
 	}
 	return m, cmd
 }
 
 func (m WizardModel) View() string {
-	title := lipgloss.NewStyle().Bold(true).Render(m.stepTitle())
-	if len(m.choices) > 0 {
-		list := ""
-		for i, c := range m.choices {
+	accent := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
+	muted  := lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
+	box    := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#7D56F4")).
+		Padding(1, 3).
+		Width(64)
+
+	step := wizardSteps[m.step]
+	progress := muted.Render("Step " + itoa(m.step+1) + " of " + itoa(len(wizardSteps)))
+
+	header := accent.Render(step.title) + "\n" +
+		muted.Render(step.subtitle) + "\n\n"
+
+	var body string
+	if len(step.choices) > 0 {
+		for i, c := range step.choices {
 			if i == m.selected {
-				list += "> " + c + "\n"
+				body += accent.Render("▶  "+c) + "\n"
 			} else {
-				list += "  " + c + "\n"
+				body += "   " + c + "\n"
 			}
 		}
-		return title + "\n\n" + list
+		body += "\n" + muted.Render("↑/↓ to choose · Enter to confirm")
+	} else {
+		body = m.input.View() + "\n\n" + muted.Render("Enter to confirm · q to quit")
 	}
-	return title + "\n\n" + m.input.View() + "\n(enter to continue, q to quit)"
+
+	return progress + "\n" + box.Render(header+body)
 }
 
 func (m *WizardModel) resetForStep(step int) {
 	m.input.SetValue("")
-	m.choices = nil
 	m.selected = 0
-
-	switch step {
-	case 0:
-		m.choices = []string{"arch", "ubuntu", "debian"}
-	case 1:
-		m.choices = []string{"bleeding", "stable"}
-	case 2:
-		m.choices = []string{"wayland", "x11"}
-	case 3:
-		m.input.Placeholder = "e.g. nvidia / none"
-	}
-}
-
-func (m WizardModel) stepTitle() string {
-	switch m.step {
-	case 0:
-		return "Base distro?"
-	case 1:
-		return "Stability preference?"
-	case 2:
-		return "Display server?"
-	case 3:
-		return "GPU driver?"
-	default:
-		return "Wizard complete"
-	}
-}
-
-func (m WizardModel) currentKey() string {
-	switch m.step {
-	case 0:
-		return "base_distro"
-	case 1:
-		return "stability"
-	case 2:
-		return "display"
-	case 3:
-		return "gpu"
-	default:
-		return "done"
+	if step < len(wizardSteps) {
+		m.input.Placeholder = wizardSteps[step].placeholder
+		if len(wizardSteps[step].choices) == 0 {
+			m.input.Focus()
+		} else {
+			m.input.Blur()
+		}
 	}
 }
 
 func (m WizardModel) Answers() map[string]string { return m.answers }
+
+func itoa(n int) string {
+	if n < 0 {
+		return "-" + itoa(-n)
+	}
+	if n < 10 {
+		return string(rune('0' + n))
+	}
+	return itoa(n/10) + string(rune('0'+n%10))
+}

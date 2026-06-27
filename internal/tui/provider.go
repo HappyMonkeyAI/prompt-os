@@ -42,6 +42,8 @@ func promptsForProvider(p string) []configPrompt {
 		}
 	case "ollama":
 		return []configPrompt{
+			{label: "API Key (Optional)", key: "api_key", password: true,
+				hint: "Optional key for authenticated local proxies/gateways (leave empty to skip)"},
 			{label: "Base URL", key: "base_url", dflt: "http://localhost:11434",
 				hint: "OpenAI-compatible endpoint — e.g. http://localhost:11434 (Ollama) · http://localhost:1234 (LM Studio)"},
 			{label: "Model", key: "model", dflt: "llama3.2",

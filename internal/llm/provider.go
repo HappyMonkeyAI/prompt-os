@@ -131,23 +131,22 @@ func (c *OpenRouterClient) Generate(ctx context.Context, prompt string) (string,
 	return openAIChat(ctx, "https://openrouter.ai/api/v1/chat/completions", c.apiKey, c.model, "https://github.com/HappyMonkeyAI/prompt-os", prompt)
 }
 
-// ---- Ollama ----------------------------------------------------------------
-
-// OllamaClient calls a local Ollama instance.
+// OllamaClient calls a local Ollama or OpenAI-compatible instance.
 type OllamaClient struct {
+	apiKey  string
 	baseURL string
 	model   string
 	timeout time.Duration
 }
 
-func NewOllamaClient(baseURL, model string) *OllamaClient {
+func NewOllamaClient(apiKey, baseURL, model string) *OllamaClient {
 	if baseURL == "" {
 		baseURL = "http://localhost:11434"
 	}
 	if model == "" {
 		model = "llama3.2"
 	}
-	return &OllamaClient{baseURL: baseURL, model: model, timeout: DefaultLLMTimeout}
+	return &OllamaClient{apiKey: apiKey, baseURL: baseURL, model: model, timeout: DefaultLLMTimeout}
 }
 
 func (c *OllamaClient) Name() string { return "ollama" }
@@ -163,8 +162,7 @@ func (c *OllamaClient) Generate(ctx context.Context, prompt string) (string, err
 	defer cancel()
 	// Use OpenAI-compatible endpoint — supported by Ollama 0.1.24+, LM Studio,
 	// LocalAI, vLLM, and any other OpenAI-compatible local server.
-	// No API key required for local servers; pass empty string.
-	return openAIChat(ctx, c.baseURL+"/v1/chat/completions", "", c.model, "", prompt)
+	return openAIChat(ctx, c.baseURL+"/v1/chat/completions", c.apiKey, c.model, "", prompt)
 }
 
 
@@ -181,7 +179,7 @@ func NewClientFromProvider(provider, apiKey, baseURL, model string) (LLMClient, 
 		c := NewOpenRouterClient(apiKey, model)
 		return c, nil
 	case "ollama":
-		return NewOllamaClient(baseURL, model), nil
+		return NewOllamaClient(apiKey, baseURL, model), nil
 	default:
 		return nil, fmt.Errorf("unknown provider: %q", provider)
 	}

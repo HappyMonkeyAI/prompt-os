@@ -3,12 +3,15 @@ set -euo pipefail
 # vm-test.sh — run end-to-end VM test for PromptOS.
 # Requires: qemu-system-x86_64, KVM enabled or TCG fallback, built image from build-iso.sh.
 
-IMAGE_PATH="${IMAGE_PATH:-$(pwd)/.build-work/promptos.img}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+IMAGE_PATH="${IMAGE_PATH:-${REPO_ROOT}/.build-work/promptos.img}"
 QEMU_ARGS="${QEMU_ARGS:-}"
 MEM_MB="${MEM_MB:-1024}"
 DISK_GB="${DISK_GB:-3}"
 
-if [ ! -f "${IMAGE_PATH}" ]; then
+if [[ ! -f "${IMAGE_PATH}" ]]; then
   echo "Missing image: ${IMAGE_PATH}"
   exit 1
 fi

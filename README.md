@@ -12,11 +12,22 @@ Instead of a static ISO or pre-baked distro, it acts as an intelligent orchestra
 
 See `progress.md` (or `progress.Md`) for handoff details when resuming.
 
-## Quick Start (Future)
-- Build or download minimal live ISO with TUI.
-- Run wizard, provide API key.
-- AI generates blueprint → chroot install → reboot into personalized system.
-- Emergency shell fallback with AI triage using baked keys.
+## Building and Booting
+
+PromptOS can be compiled and built into a fully bootable disk image. This image can be directly flashed to a physical USB drive or run inside Virtual Machines (QEMU, VMware, VirtualBox).
+
+* For detailed prerequisites and build instructions, see [docs/build-instructions.md](docs/build-instructions.md).
+* To run the image in a local VM test environment using QEMU:
+  ```bash
+  ./build/scripts/vm-test.sh
+  ```
+
+## Quick Start (Usage Flow)
+- Boot the minimal live image containing the PromptOS TUI.
+- Run the TUI wizard, select your AI provider, and input your API key.
+- The AI scans local hardware and generates a custom, structured JSON installation blueprint.
+- The executor performs partitioning, runs chroot bootstrap installations, and drops configurations.
+- Emergency shell fallback with AI triage kicks in on boot failure.
 
 ## Name
 PromptOS (chosen after availability check; academic paper only, no active OS/distributor conflict).

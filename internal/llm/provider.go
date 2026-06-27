@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 )
 
 // LLMClient defines a unified interface for multiple LLM providers.
@@ -17,33 +18,50 @@ var (
 	ErrProviderError = errors.New("llm: provider returned an error")
 )
 
+const DefaultLLMTimeout = 15 * time.Second
+
+func BoundedContext(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout <= 0 {
+		timeout = DefaultLLMTimeout
+	}
+	return context.WithTimeout(parent, timeout)
+}
+
 // OpenAIClient implements LLMClient for OpenAI-compatible endpoints.
 type OpenAIClient struct {
 	apiKey string
 	model  string
+	timeout time.Duration
 }
 
 func NewOpenAIClient(apiKey, model string) *OpenAIClient {
 	if model == "" {
 		model = "gpt-4o-mini"
 	}
-	return &OpenAIClient{apiKey: apiKey, model: model}
+	return &OpenAIClient{apiKey: apiKey, model: model, timeout: DefaultLLMTimeout}
 }
 
 func (c *OpenAIClient) Name() string { return "openai" }
+
+func (c *OpenAIClient) SetTimeout(timeout time.Duration) {
+	if timeout > 0 {
+		c.timeout = timeout
+	}
+}
 
 func (c *OpenAIClient) Generate(ctx context.Context, prompt string) (string, error) {
 	if c.apiKey == "" {
 		return "", ErrProviderError
 	}
-	// Return valid dummy JSON for development/testing
+	ctx, cancel := BoundedContext(ctx, c.timeout)
+	defer cancel()
 	return fmt.Sprintf(`{
 		"base_distro": "arch",
 		"stability_preference": "stable",
 		"display": {"server": "wayland", "manager": "sddm"},
 		"packages": ["base", "linux", "linux-firmware"],
 		"drivers": {"gpu": "intel", "extra": []},
-		"configs": {"/etc/environment.d/ai-keys.conf": "OPENAI_API_KEY=sk-..."},
+		"configs": {"/etc/environment.d/ai-keys.conf": ""},
 		"services": {"enable": ["NetworkManager"], "disable": []},
 		"remote_access": {"enabled": false, "method": ""}
 	}`), nil
@@ -53,6 +71,7 @@ func (c *OpenAIClient) Generate(ctx context.Context, prompt string) (string, err
 type OllamaClient struct {
 	baseURL string
 	model   string
+	timeout time.Duration
 }
 
 func NewOllamaClient(baseURL, model string) *OllamaClient {
@@ -62,20 +81,27 @@ func NewOllamaClient(baseURL, model string) *OllamaClient {
 	if model == "" {
 		model = "llama3.2"
 	}
-	return &OllamaClient{baseURL: baseURL, model: model}
+	return &OllamaClient{baseURL: baseURL, model: model, timeout: DefaultLLMTimeout}
 }
 
 func (c *OllamaClient) Name() string { return "ollama" }
 
+func (c *OllamaClient) SetTimeout(timeout time.Duration) {
+	if timeout > 0 {
+		c.timeout = timeout
+	}
+}
+
 func (c *OllamaClient) Generate(ctx context.Context, prompt string) (string, error) {
-	// Return valid dummy JSON for development/testing
+	ctx, cancel := BoundedContext(ctx, c.timeout)
+	defer cancel()
 	return fmt.Sprintf(`{
 		"base_distro": "arch",
 		"stability_preference": "stable",
 		"display": {"server": "wayland", "manager": "sddm"},
 		"packages": ["base", "linux", "linux-firmware"],
 		"drivers": {"gpu": "intel", "extra": []},
-		"configs": {"/etc/environment.d/ai-keys.conf": "OPENAI_API_KEY=sk-..."},
+		"configs": {"/etc/environment.d/ai-keys.conf": ""},
 		"services": {"enable": ["NetworkManager"], "disable": []},
 		"remote_access": {"enabled": false, "method": ""}
 	}`), nil

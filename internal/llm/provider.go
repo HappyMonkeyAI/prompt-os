@@ -161,46 +161,12 @@ func (c *OllamaClient) SetTimeout(d time.Duration) {
 func (c *OllamaClient) Generate(ctx context.Context, prompt string) (string, error) {
 	ctx, cancel := BoundedContext(ctx, c.timeout)
 	defer cancel()
-
-	reqBody := ollamaRequest{
-		Model:  c.model,
-		Prompt: prompt,
-		Stream: false,
-	}
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		return "", err
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/generate", bytes.NewReader(body))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrProviderError, err)
-	}
-	defer resp.Body.Close()
-
-	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("%w: HTTP %d: %s", ErrProviderError, resp.StatusCode, string(raw))
-	}
-
-	var result ollamaResponse
-	if err := json.Unmarshal(raw, &result); err != nil {
-		return "", err
-	}
-	if result.Response == "" {
-		return "", ErrEmptyResponse
-	}
-	return result.Response, nil
+	// Use OpenAI-compatible endpoint — supported by Ollama 0.1.24+, LM Studio,
+	// LocalAI, vLLM, and any other OpenAI-compatible local server.
+	// No API key required for local servers; pass empty string.
+	return openAIChat(ctx, c.baseURL+"/v1/chat/completions", "", c.model, "", prompt)
 }
+
 
 // ---- NewClientFromProvider -------------------------------------------------
 

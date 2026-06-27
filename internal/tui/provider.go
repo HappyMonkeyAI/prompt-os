@@ -43,7 +43,7 @@ func promptsForProvider(p string) []configPrompt {
 	case "ollama":
 		return []configPrompt{
 			{label: "Base URL", key: "base_url", dflt: "http://localhost:11434",
-				hint: "Address of your Ollama server (default: http://localhost:11434)"},
+				hint: "OpenAI-compatible endpoint — e.g. http://localhost:11434 (Ollama) · http://localhost:1234 (LM Studio)"},
 			{label: "Model", key: "model", dflt: "llama3.2",
 				hint: "e.g. llama3.2 · mistral · codellama · gemma2"},
 		}
@@ -56,6 +56,7 @@ type ProviderModel struct {
 	providers    []string
 	selected     int
 	providerName string
+	done         bool // true once all prompts answered; guards View() + Update()
 
 	// dynamic prompts for the selected provider
 	prompts     []configPrompt
@@ -122,7 +123,8 @@ func (m ProviderModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.promptIndex++
 
 			if m.promptIndex >= len(m.prompts) {
-				// All prompts answered — emit done message
+				// Mark done before emitting — prevents View() panic while Bubble Tea drains events
+				m.done = true
 				return m, func() tea.Msg {
 					return ProviderDoneMsg{
 						Provider: m.providerName,
@@ -165,6 +167,15 @@ func (m ProviderModel) View() string {
 		BorderForeground(lipgloss.Color("#7D56F4")).
 		Padding(1, 3).
 		Width(60)
+
+	// Guard: promptIndex may equal len(prompts) momentarily after the last Enter
+	// before the parent AppModel processes ProviderDoneMsg and transitions stage.
+	if m.done || (m.providerName != "" && m.promptIndex >= len(m.prompts)) {
+		return box.Render(
+			accent.Render("Provider configured!") + "\n\n" +
+				muted.Render("Starting wizard…"),
+		)
+	}
 
 	// Phase 1: provider list
 	if m.providerName == "" {

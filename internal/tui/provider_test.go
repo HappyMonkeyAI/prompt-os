@@ -16,23 +16,27 @@ func TestProviderKeyValidation(t *testing.T) {
 
 	// Valid key after choosing provider via WithProvider
 	m2 := m.WithProvider("openai")
+	m2.values["api_key"] = "sk-test123"
 	if !m2.ValidateKey("sk-test123") {
 		t.Error("expected valid key to pass")
 	}
 
-	// Simulate full flow: choose provider (enter), then type key
+	// Simulate flow: select provider with Enter → should set providerName
 	m3 := NewProviderModel()
-	// Press Enter to select the first provider → enters key-entry mode
 	updated, _ := m3.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m3 = updated.(ProviderModel)
-	if !m3.enteringKey {
-		t.Error("expected enteringKey to be true after selecting provider")
+	if m3.providerName == "" {
+		t.Error("expected providerName to be set after Enter on provider list")
 	}
-	// Type a key
+	if len(m3.prompts) == 0 {
+		t.Error("expected prompts to be populated after provider selection")
+	}
+
+	// Type a key value in the first prompt
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("sk-abc")}
 	updated2, _ := m3.Update(msg)
 	pm := updated2.(ProviderModel)
-	if pm.keyInput.Value() == "" {
-		t.Error("expected key input to capture runes")
+	if pm.input.Value() == "" {
+		t.Error("expected input to capture runes during config prompt")
 	}
 }

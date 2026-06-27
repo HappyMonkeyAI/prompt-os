@@ -64,7 +64,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Provider confirmed → build LLM client → advance to wizard
 	case tui.ProviderDoneMsg:
-		client, err := llm.NewClientFromProvider(msg.Provider, msg.APIKey)
+		client, err := llm.NewClientFromProvider(msg.Provider, msg.APIKey, msg.BaseURL, msg.Model)
 		if err != nil {
 			m.initErr = err
 			return m, nil

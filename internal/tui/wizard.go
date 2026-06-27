@@ -57,9 +57,10 @@ var wizardSteps = []wizardStep{
 
 // WizardModel walks the user through OS preference questions.
 type WizardModel struct {
-	step    int
-	answers map[string]string
-	input   textinput.Model
+	step     int
+	done     bool // true once all steps complete, guards View() and Update()
+	answers  map[string]string
+	input    textinput.Model
 	selected int
 }
 
@@ -80,6 +81,11 @@ func NewWizardModel() WizardModel {
 func (m WizardModel) Init() tea.Cmd { return textinput.Blink }
 
 func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Once done, ignore all further input
+	if m.done {
+		return m, nil
+	}
+
 	var cmd tea.Cmd
 	step := wizardSteps[m.step]
 
@@ -90,9 +96,9 @@ func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "enter":
-			// Capture the answer for this step
+			// Capture answer for current step
 			if len(step.choices) > 0 {
-				// Strip the annotation after two spaces (e.g. "stable  (recommended)" → "stable")
+				// Strip annotation after two spaces ("stable  (recommended)" → "stable")
 				raw := step.choices[m.selected]
 				if idx := strings.Index(raw, "  "); idx >= 0 {
 					raw = raw[:idx]
@@ -101,13 +107,15 @@ func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				val := strings.TrimSpace(m.input.Value())
 				if val == "" {
-					return m, nil // require non-empty for free-text
+					return m, nil // require non-empty free-text
 				}
 				m.answers[step.key] = val
 			}
 
 			m.step++
 			if m.step >= len(wizardSteps) {
+				// Mark done before emitting — prevents any further View/Update panics
+				m.done = true
 				answers := make(map[string]string, len(m.answers))
 				for k, v := range m.answers {
 					answers[k] = v
@@ -128,7 +136,8 @@ func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if len(wizardSteps[m.step].choices) == 0 {
+	// Only forward input to the text field when on a free-text step
+	if !m.done && m.step < len(wizardSteps) && len(wizardSteps[m.step].choices) == 0 {
 		m.input, cmd = m.input.Update(msg)
 	}
 	return m, cmd
@@ -142,6 +151,15 @@ func (m WizardModel) View() string {
 		BorderForeground(lipgloss.Color("#7D56F4")).
 		Padding(1, 3).
 		Width(64)
+
+	// Guard: step may momentarily equal len(wizardSteps) after the last Enter
+	// before the parent AppModel processes WizardDoneMsg and transitions stage.
+	if m.done || m.step >= len(wizardSteps) {
+		return box.Render(
+			accent.Render("Answers collected!") + "\n\n" +
+				muted.Render("Connecting to AI provider…"),
+		)
+	}
 
 	step := wizardSteps[m.step]
 	progress := muted.Render("Step " + itoa(m.step+1) + " of " + itoa(len(wizardSteps)))

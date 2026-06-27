@@ -204,16 +204,18 @@ func (c *OllamaClient) Generate(ctx context.Context, prompt string) (string, err
 
 // ---- NewClientFromProvider -------------------------------------------------
 
-// NewClientFromProvider constructs an LLMClient from a provider name and API key.
-// For ollama the apiKey is ignored (no auth needed).
-func NewClientFromProvider(provider, apiKey string) (LLMClient, error) {
+// NewClientFromProvider constructs an LLMClient from a provider name, API key,
+// base URL (for Ollama or custom endpoints), and model name.
+// Empty strings fall back to sensible defaults in each client.
+func NewClientFromProvider(provider, apiKey, baseURL, model string) (LLMClient, error) {
 	switch provider {
 	case "openai":
-		return NewOpenAIClient(apiKey, ""), nil
+		return NewOpenAIClient(apiKey, model), nil
 	case "openrouter":
-		return NewOpenRouterClient(apiKey, ""), nil
+		c := NewOpenRouterClient(apiKey, model)
+		return c, nil
 	case "ollama":
-		return NewOllamaClient("", ""), nil
+		return NewOllamaClient(baseURL, model), nil
 	default:
 		return nil, fmt.Errorf("unknown provider: %q", provider)
 	}

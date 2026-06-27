@@ -1,39 +1,79 @@
 package tui
 
 import (
+	"fmt"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 )
 
-// ProviderDoneMsg is emitted when the user has confirmed a provider + API key.
+// ProviderDoneMsg is emitted when the user has confirmed all provider settings.
 type ProviderDoneMsg struct {
 	Provider string
 	APIKey   string
+	BaseURL  string
+	Model    string
 }
 
-// ProviderModel handles AI provider selection and API key entry.
+// configPrompt describes a single text-input prompt within the provider config flow.
+type configPrompt struct {
+	label    string
+	key      string // internal key: "api_key", "base_url", "model"
+	dflt     string // shown as placeholder; used as value if user leaves empty
+	password bool
+	hint     string
+}
+
+// promptsForProvider returns the ordered list of config prompts for a provider.
+func promptsForProvider(p string) []configPrompt {
+	switch p {
+	case "openai":
+		return []configPrompt{
+			{label: "API Key", key: "api_key", password: true,
+				hint: "sk-…  (your OpenAI secret key)"},
+		}
+	case "openrouter":
+		return []configPrompt{
+			{label: "API Key", key: "api_key", password: true,
+				hint: "sk-or-v1-…  (your OpenRouter key)"},
+			{label: "Model", key: "model", dflt: "openai/gpt-4o-mini",
+				hint: "e.g. openai/gpt-4o-mini · anthropic/claude-3-haiku · mistralai/mistral-7b"},
+		}
+	case "ollama":
+		return []configPrompt{
+			{label: "Base URL", key: "base_url", dflt: "http://localhost:11434",
+				hint: "Address of your Ollama server (default: http://localhost:11434)"},
+			{label: "Model", key: "model", dflt: "llama3.2",
+				hint: "e.g. llama3.2 · mistral · codellama · gemma2"},
+		}
+	}
+	return nil
+}
+
+// ProviderModel handles AI provider selection and per-provider config entry.
 type ProviderModel struct {
-	provider  string
-	keyInput  textinput.Model
-	providers []string
-	selected  int
-	// enteringKey is true once a provider has been chosen and we're collecting the key
-	enteringKey bool
+	providers    []string
+	selected     int
+	providerName string
+
+	// dynamic prompts for the selected provider
+	prompts     []configPrompt
+	promptIndex int
+	values      map[string]string // keyed by configPrompt.key
+	input       textinput.Model
 }
 
 func NewProviderModel() ProviderModel {
 	ti := textinput.New()
-	ti.Placeholder = "Paste your API key here"
-	ti.Focus()
 	ti.CharLimit = 256
 	ti.Width = 52
-	ti.EchoMode = textinput.EchoPassword // mask the key
 
 	return ProviderModel{
 		providers: []string{"openai", "openrouter", "ollama"},
 		selected:  0,
-		keyInput:  ti,
+		values:    make(map[string]string),
+		input:     ti,
 	}
 }
 
@@ -44,54 +84,77 @@ func (m ProviderModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if m.enteringKey {
+		// ── Phase 1: provider list ──────────────────────────────────────────
+		if m.providerName == "" {
 			switch msg.String() {
-			case "ctrl+c":
-				return m, tea.Quit
-			case "enter":
-				key := m.keyInput.Value()
-				// Ollama needs no key; other providers require one
-				if m.provider == "ollama" || len(key) > 0 {
-					return m, func() tea.Msg {
-						return ProviderDoneMsg{Provider: m.provider, APIKey: key}
-					}
+			case "up", "k":
+				if m.selected > 0 {
+					m.selected--
 				}
-				// Key required but empty — stay and flash placeholder
-				m.keyInput.Placeholder = "Key required — paste it and press Enter"
-				return m, nil
+			case "down", "j":
+				if m.selected < len(m.providers)-1 {
+					m.selected++
+				}
+			case "enter":
+				m.providerName = m.providers[m.selected]
+				m.prompts = promptsForProvider(m.providerName)
+				m.promptIndex = 0
+				m.values = make(map[string]string)
+				m.setupInput(0)
+				return m, textinput.Blink
+			case "q", "ctrl+c":
+				return m, tea.Quit
 			}
-			m.keyInput, cmd = m.keyInput.Update(msg)
 			return m, cmd
 		}
 
-		// Provider selection mode
+		// ── Phase 2: per-provider config prompts ────────────────────────────
 		switch msg.String() {
-		case "up", "k":
-			if m.selected > 0 {
-				m.selected--
-			}
-		case "down", "j":
-			if m.selected < len(m.providers)-1 {
-				m.selected++
-			}
-		case "enter":
-			m.provider = m.providers[m.selected]
-			m.enteringKey = true
-			m.keyInput.SetValue("")
-			m.keyInput.Focus()
-			// Ollama needs no key — tell the user
-			if m.provider == "ollama" {
-				m.keyInput.Placeholder = "No key needed — press Enter to continue"
-			} else {
-				m.keyInput.Placeholder = "Paste your API key here"
-			}
-			return m, textinput.Blink
-		case "q", "ctrl+c":
+		case "ctrl+c":
 			return m, tea.Quit
+		case "enter":
+			val := m.input.Value()
+			if val == "" {
+				// Use the default if the user pressed Enter on an empty field
+				val = m.prompts[m.promptIndex].dflt
+			}
+			m.values[m.prompts[m.promptIndex].key] = val
+			m.promptIndex++
+
+			if m.promptIndex >= len(m.prompts) {
+				// All prompts answered — emit done message
+				return m, func() tea.Msg {
+					return ProviderDoneMsg{
+						Provider: m.providerName,
+						APIKey:   m.values["api_key"],
+						BaseURL:  m.values["base_url"],
+						Model:    m.values["model"],
+					}
+				}
+			}
+			m.setupInput(m.promptIndex)
+			return m, textinput.Blink
 		}
+
+		m.input, cmd = m.input.Update(msg)
+		return m, cmd
 	}
 
 	return m, cmd
+}
+
+func (m *ProviderModel) setupInput(idx int) {
+	p := m.prompts[idx]
+	m.input.SetValue("")
+	m.input.Placeholder = p.hint
+	m.input.CharLimit = 256
+	m.input.Width = 52
+	if p.password {
+		m.input.EchoMode = textinput.EchoPassword
+	} else {
+		m.input.EchoMode = textinput.EchoNormal
+	}
+	m.input.Focus()
 }
 
 func (m ProviderModel) View() string {
@@ -101,49 +164,60 @@ func (m ProviderModel) View() string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#7D56F4")).
 		Padding(1, 3).
-		Width(58)
+		Width(60)
 
-	if m.enteringKey {
-		hint := "Enter to confirm"
-		if m.provider == "ollama" {
-			hint = "Ensure Ollama is running locally, then press Enter"
+	// Phase 1: provider list
+	if m.providerName == "" {
+		title := accent.Render("Select AI Provider") + "\n" +
+			muted.Render("↑/↓ to navigate · Enter to select · q to quit") + "\n\n"
+
+		descriptions := map[string]string{
+			"openai":     "OpenAI  —  gpt-4o-mini (API key required)",
+			"openrouter": "OpenRouter  —  200+ models via one key",
+			"ollama":     "Ollama  —  local, no API key needed",
 		}
-		content := accent.Render("Provider: "+m.provider) + "\n\n" +
-			"API Key:\n" + m.keyInput.View() + "\n\n" +
-			muted.Render(hint)
-		return box.Render(content)
+		list := ""
+		for i, p := range m.providers {
+			label := descriptions[p]
+			if i == m.selected {
+				list += accent.Render("▶  "+label) + "\n"
+			} else {
+				list += "   " + label + "\n"
+			}
+		}
+		return box.Render(title + list)
 	}
 
-	title := accent.Render("Select AI Provider") + "\n" +
-		muted.Render("↑/↓ to navigate · Enter to select · q to quit") + "\n\n"
-
-	list := ""
-	descriptions := map[string]string{
-		"openai":     "OpenAI  (gpt-4o-mini)",
-		"openrouter": "OpenRouter  (access 200+ models)",
-		"ollama":     "Ollama  (local, no API key needed)",
+	// Phase 2: config prompts
+	prompt := m.prompts[m.promptIndex]
+	progress := muted.Render(fmt.Sprintf("Provider: %s  ·  Field %d of %d",
+		m.providerName, m.promptIndex+1, len(m.prompts)))
+	header := accent.Render(prompt.label) + "\n"
+	if prompt.dflt != "" {
+		header += muted.Render("Default: "+prompt.dflt) + "\n"
 	}
-	for i, p := range m.providers {
-		label := descriptions[p]
-		if label == "" {
-			label = p
-		}
-		if i == m.selected {
-			list += accent.Render("▶  "+label) + "\n"
-		} else {
-			list += "   " + label + "\n"
-		}
+	header += "\n"
+	hint := "Enter to confirm"
+	if prompt.dflt != "" {
+		hint = "Enter to confirm  (leave empty to use default)"
 	}
+	body := m.input.View() + "\n\n" + muted.Render(hint)
 
-	return box.Render(title + list)
+	return progress + "\n" + box.Render(header+body)
 }
 
-func (m ProviderModel) WithProvider(p string) ProviderModel { m.provider = p; return m }
-func (m ProviderModel) SetProvider(p string)                 { /* no-op: use WithProvider for mutations */ }
+// WithProvider returns a copy of the model with the named provider set.
+// Used in tests and for pre-seeding the model.
+func (m ProviderModel) WithProvider(p string) ProviderModel { m.providerName = p; return m }
 
+// ValidateKey returns true if the given key is non-empty and a provider is set.
+// Pass an empty string to check the currently entered key.
 func (m ProviderModel) ValidateKey(k string) bool {
 	if k == "" {
-		k = m.keyInput.Value()
+		k = m.values["api_key"]
 	}
-	return len(k) > 0 && m.provider != ""
+	return len(k) > 0 && m.providerName != ""
 }
+
+// SetProvider is kept for backward compatibility (no-op; use WithProvider).
+func (m ProviderModel) SetProvider(_ string) {}

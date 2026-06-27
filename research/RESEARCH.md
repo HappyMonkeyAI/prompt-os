@@ -13,6 +13,7 @@
 - EndeavourOS/Calamares GUI installers.
 - RHEL AI / Canonical Charmed (enterprise scale, not DIY conversational).
 - AI package managers (Renovate etc.) and post-install LLM server agents — complementary but not installer-focused.
+- [thomastschinkel/prompt-os](https://github.com/thomastschinkel/prompt-os) — A prompt-driven terminal client/workspace UI (useful reference if the project ever expands into a desktop AI UI service).
 - No direct live conversational bootstrap matches found.
 
 **Research Angles Explored (initial):**

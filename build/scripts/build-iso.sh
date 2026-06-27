@@ -190,11 +190,14 @@ sed -i 's|tty1::respawn:/sbin/getty 38400 tty1|tty1::respawn:/sbin/agetty --auto
 
 # Create root .profile: exec PromptOS TUI automatically on login
 # If the TUI exits or crashes, the user gets a recovery shell
+# Only run if we are on the physical console tty1 (prevents running during build chroot)
 mkdir -p "${WORK_DIR}/mnt/root"
 printf '%s\n' \
   '#!/bin/sh' \
   '# PromptOS auto-start - runs on every root login (via agetty auto-login)' \
-  'exec /usr/local/bin/promptos' \
+  'if [ "$(tty)" = "/dev/tty1" ]; then' \
+  '    exec /usr/local/bin/promptos' \
+  'fi' \
   > "${WORK_DIR}/mnt/root/.profile"
 chmod 700 "${WORK_DIR}/mnt/root/.profile"
 

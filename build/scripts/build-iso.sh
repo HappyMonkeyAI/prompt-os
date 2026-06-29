@@ -179,9 +179,34 @@ sed "s|ROOT_UUID_PLACEHOLDER|${FS_UUID}|g" \
   "${REPO_ROOT}/build/alpine-live/grub.cfg" \
   > "${WORK_DIR}/mnt/boot/grub/grub.cfg"
 
-echo "==> configuring auto-login and TUI launch"
 # Set hostname
 echo 'promptos' > "${WORK_DIR}/mnt/etc/hostname"
+
+# Configure /etc/fstab to mount root writable on boot
+cat > "${WORK_DIR}/mnt/etc/fstab" <<EOF
+UUID=${FS_UUID} / ext4 rw,relatime,errors=remount-ro 0 1
+devpts          /dev/pts        devpts  gid=5,mode=620    0 0
+sysfs           /sys            sysfs   defaults          0 0
+proc            /proc           proc    defaults          0 0
+EOF
+
+# Configure /etc/network/interfaces for DHCP on standard ethernet interfaces
+mkdir -p "${WORK_DIR}/mnt/etc/network"
+cat > "${WORK_DIR}/mnt/etc/network/interfaces" <<EOF
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet dhcp
+
+auto ens33
+iface ens33 inet dhcp
+    pre-up ip link show ens33 2>/dev/null || { echo "Interface ens33 not found, skipping"; exit 0; }
+
+auto ens34
+iface ens34 inet dhcp
+    pre-up ip link show ens34 2>/dev/null || { echo "Interface ens34 not found, skipping"; exit 0; }
+EOF
 
 # Patch inittab: replace plain BusyBox getty on tty1 with agetty --autologin root
 # inittab controls getty in Alpine minirootfs (not OpenRC agetty service files)
@@ -205,8 +230,11 @@ echo "==> configuring services and grub bootloader"
 # Enable services in Alpine
 chroot "${WORK_DIR}/mnt" /bin/sh -lc 'rc-update add udev sysinit' || true
 chroot "${WORK_DIR}/mnt" /bin/sh -lc 'rc-update add udev-trigger sysinit' || true
-chroot "${WORK_DIR}/mnt" /bin/sh -lc 'rc-update add agetty.tty1 default' || true
-chroot "${WORK_DIR}/mnt" /bin/sh -lc 'rc-update add vmware-tools default' 2>/dev/null || true
+chroot "${WORK_DIR}/mnt" /bin/sh -lc 'rc-update add loopback boot' || true
+chroot "${WORK_DIR}/mnt" /bin/sh -lc 'rc-update add bootmisc boot' || true
+chroot "${WORK_DIR}/mnt" /bin/sh -lc 'rc-update add localmount boot' || true
+chroot "${WORK_DIR}/mnt" /bin/sh -lc 'rc-update add networking default' || true
+chroot "${WORK_DIR}/mnt" /bin/sh -lc 'rc-update add open-vm-tools default' || true
 
 # Mount API filesystems to run grub-install
 mount --bind /dev "${WORK_DIR}/mnt/dev"

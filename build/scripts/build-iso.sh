@@ -201,9 +201,11 @@ iface eth0 inet dhcp
 
 auto ens33
 iface ens33 inet dhcp
+    pre-up ip link show ens33 2>/dev/null || { echo "Interface ens33 not found, skipping"; exit 0; }
 
 auto ens34
 iface ens34 inet dhcp
+    pre-up ip link show ens34 2>/dev/null || { echo "Interface ens34 not found, skipping"; exit 0; }
 EOF
 
 # Patch inittab: replace plain BusyBox getty on tty1 with agetty --autologin root

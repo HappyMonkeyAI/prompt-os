@@ -184,7 +184,7 @@ echo 'promptos' > "${WORK_DIR}/mnt/etc/hostname"
 
 # Configure /etc/fstab to mount root writable on boot
 cat > "${WORK_DIR}/mnt/etc/fstab" <<EOF
-UUID=${FS_UUID} / ext4 rw,relatime 0 1
+UUID=${FS_UUID} / ext4 rw,relatime,errors=remount-ro 0 1
 devpts          /dev/pts        devpts  gid=5,mode=620    0 0
 sysfs           /sys            sysfs   defaults          0 0
 proc            /proc           proc    defaults          0 0

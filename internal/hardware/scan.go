@@ -6,11 +6,23 @@ import (
 	"strings"
 )
 
+type BlockDevice struct {
+	Name      string
+	Path      string
+	Size      string
+	Model     string
+	Type      string
+	Removable bool
+	ReadOnly  bool
+	Transport string
+}
+
 type HardwareInfo struct {
 	CPU   string
 	GPU   string
 	RAM   string
 	Disk  string
+	Disks []BlockDevice
 	Arch  string
 	Cores int
 }
@@ -77,6 +89,68 @@ func Scan() HardwareInfo {
 	if info.Disk == "" {
 		info.Disk = "unknown"
 	}
+	info.Disks = parseBlockDevices(commandOutput("lsblk", "-dnP", "-o", "NAME,SIZE,MODEL,TYPE,RM,RO,TRAN"))
 
 	return info
+}
+
+func commandOutput(name string, args ...string) string {
+	out, err := exec.Command(name, args...).Output()
+	if err != nil {
+		return ""
+	}
+	return string(out)
+}
+
+func parseBlockDevices(out string) []BlockDevice {
+	var devices []BlockDevice
+	for _, line := range strings.Split(out, "\n") {
+		attrs := parseKeyValueLine(line)
+		if attrs["TYPE"] != "disk" || attrs["NAME"] == "" {
+			continue
+		}
+		name := attrs["NAME"]
+		devices = append(devices, BlockDevice{
+			Name:      name,
+			Path:      "/dev/" + name,
+			Size:      attrs["SIZE"],
+			Model:     attrs["MODEL"],
+			Type:      attrs["TYPE"],
+			Removable: attrs["RM"] == "1",
+			ReadOnly:  attrs["RO"] == "1",
+			Transport: attrs["TRAN"],
+		})
+	}
+	return devices
+}
+
+func parseKeyValueLine(line string) map[string]string {
+	attrs := make(map[string]string)
+	for i := 0; i < len(line); {
+		for i < len(line) && line[i] == ' ' {
+			i++
+		}
+		start := i
+		for i < len(line) && line[i] != '=' {
+			i++
+		}
+		if i >= len(line) {
+			continue
+		}
+		key := line[start:i]
+		i++
+		if i >= len(line) || line[i] != '"' {
+			continue
+		}
+		i++
+		valueStart := i
+		for i < len(line) && line[i] != '"' {
+			i++
+		}
+		attrs[key] = line[valueStart:i]
+		if i < len(line) {
+			i++
+		}
+	}
+	return attrs
 }

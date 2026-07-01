@@ -70,7 +70,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.llmClient = client
-		m.wizard = tui.NewWizardModel()
+		m.wizard = tui.NewWizardModelWithHardware(m.hw)
 		m.stage = stageWizard
 		return m, m.wizard.Init()
 
@@ -116,7 +116,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m AppModel) View() string {
 	accent := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
-	muted  := lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
+	muted := lipgloss.NewStyle().Foreground(lipgloss.Color("#555555"))
 
 	if m.initErr != nil {
 		return lipgloss.NewStyle().

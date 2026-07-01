@@ -17,6 +17,7 @@ PROMPTOS_BIN_SRC="${PROMPTOS_BIN_SRC:-${REPO_ROOT}/cmd/promptos}"
 # -------------------
 
 LOOP_DEV=""
+LOOP_MAPPER_CREATED=0
 cleanup() {
   echo "==> cleaning up mounts and loop devices"
   umount "${WORK_DIR}/mnt/dev" 2>/dev/null || true
@@ -24,6 +25,9 @@ cleanup() {
   umount "${WORK_DIR}/mnt/sys" 2>/dev/null || true
   umount "${WORK_DIR}/mnt" 2>/dev/null || true
   if [[ -n "${LOOP_DEV}" ]]; then
+    if [[ "${LOOP_MAPPER_CREATED}" == "1" ]] && command -v kpartx >/dev/null 2>&1; then
+      kpartx -dv "${LOOP_DEV}" 2>/dev/null || true
+    fi
     losetup -d "${LOOP_DEV}" 2>/dev/null || true
   fi
 }
@@ -71,6 +75,8 @@ echo "==> mount and format partition"
 LOOP_DEV="$(losetup -P --show -f "${IMAGE_PATH}")"
 sleep 1
 PART_DEV="${LOOP_DEV}p1"
+PART_OFFSET_BYTES=$((2048 * 512))
+PART_USES_OFFSET=0
 if [[ ! -b "${PART_DEV}" && -b "${LOOP_DEV}1" ]]; then
   PART_DEV="${LOOP_DEV}1"
 fi
@@ -88,17 +94,43 @@ if [[ ! -b "${PART_DEV}" ]]; then
   done
 fi
 if [[ ! -b "${PART_DEV}" ]]; then
-  echo "Error: partition device not found for ${LOOP_DEV}" >&2
+  if command -v kpartx >/dev/null 2>&1; then
+    echo "Partition block device not found for ${LOOP_DEV}; using kpartx mapper"
+    kpartx -av "${LOOP_DEV}"
+    LOOP_MAPPER_CREATED=1
+    PART_DEV="/dev/mapper/$(basename "${LOOP_DEV}")p1"
+  else
+    echo "Partition block device not found for ${LOOP_DEV}; using image offset ${PART_OFFSET_BYTES}"
+    PART_DEV="${IMAGE_PATH}"
+    PART_USES_OFFSET=1
+  fi
+fi
+if [[ ! -b "${PART_DEV}" && "${PART_USES_OFFSET}" != "1" ]]; then
+  echo "Error: partition device not found: ${PART_DEV}" >&2
   exit 1
 fi
 
-mkfs.ext4 -F "${PART_DEV}"
+if [[ "${PART_USES_OFFSET}" == "1" ]]; then
+  mkfs.ext4 -F -E "offset=${PART_OFFSET_BYTES}" "${IMAGE_PATH}"
+else
+  mkfs.ext4 -F "${PART_DEV}"
+fi
 
 # Capture the filesystem UUID for hardware-agnostic GRUB root arg
-FS_UUID="$(blkid -s UUID -o value "${PART_DEV}")"
+if [[ "${PART_USES_OFFSET}" == "1" ]]; then
+  FS_UUID="$(blkid -p -O "${PART_OFFSET_BYTES}" -s UUID -o value "${IMAGE_PATH}")"
+else
+  FS_UUID="$(blkid -s UUID -o value "${PART_DEV}")"
+fi
 echo "==> filesystem UUID: ${FS_UUID}"
 
-mount "${PART_DEV}" "${WORK_DIR}/mnt"
+if [[ "${PART_USES_OFFSET}" == "1" ]]; then
+  losetup -d "${LOOP_DEV}" 2>/dev/null || true
+  LOOP_DEV=""
+  mount -o "loop,offset=${PART_OFFSET_BYTES}" "${IMAGE_PATH}" "${WORK_DIR}/mnt"
+else
+  mount "${PART_DEV}" "${WORK_DIR}/mnt"
+fi
 tar -xzf "${WORK_DIR}/minirootfs.tar.gz" -C "${WORK_DIR}/mnt"
 
 # Ensure we have DNS resolution inside the chroot for package installation
@@ -117,12 +149,12 @@ printf '%s\n' \
   "https://dl-cdn.alpinelinux.org/alpine/v3.20/community" \
   > "${WORK_DIR}/mnt/etc/apk/repositories"
 # open-vm-tools: better VMware hardware integration (SCSI/SATA detection, guest services)
-chroot "${WORK_DIR}/mnt" /bin/sh -lc '/usr/sbin/apk.static add --no-cache bash util-linux linux-virt grub-bios openrc eudev open-vm-tools'
+chroot "${WORK_DIR}/mnt" /bin/sh -lc '/usr/sbin/apk.static add --no-cache bash util-linux linux-virt grub-bios openrc eudev open-vm-tools parted dosfstools e2fsprogs debootstrap arch-install-scripts zstd binutils tar wget gnupg debian-archive-keyring ubuntu-keyring'
 
 echo "==> retry base packages if transient fetch failed"
 if ! chroot "${WORK_DIR}/mnt" /bin/bash -lc '[[ -x /usr/bin/bash && -x /bin/fdisk ]]'; then
   sleep 3
-  chroot "${WORK_DIR}/mnt" /bin/sh -lc '/usr/sbin/apk.static add --no-cache bash util-linux linux-virt grub-bios openrc eudev open-vm-tools' || true
+  chroot "${WORK_DIR}/mnt" /bin/sh -lc '/usr/sbin/apk.static add --no-cache bash util-linux linux-virt grub-bios openrc eudev open-vm-tools parted dosfstools e2fsprogs debootstrap arch-install-scripts zstd binutils tar wget gnupg debian-archive-keyring ubuntu-keyring' || true
 fi
 
 echo "==> verify required tooling"
@@ -241,13 +273,34 @@ mount --bind /dev "${WORK_DIR}/mnt/dev"
 mount --bind /proc "${WORK_DIR}/mnt/proc"
 mount --bind /sys "${WORK_DIR}/mnt/sys"
 
-# Install GRUB in the loop device MBR (legacy BIOS)
-chroot "${WORK_DIR}/mnt" grub-install --target=i386-pc --force "${LOOP_DEV}"
+# If the partition was mounted via file offset, reattach the whole image now so
+# grub-install can write the MBR.
+if [[ -z "${LOOP_DEV}" ]]; then
+  LOOP_DEV="$(losetup --show -f "${IMAGE_PATH}")"
+fi
+
+# Install GRUB in the loop device MBR (legacy BIOS). Run grub-install from the
+# build host/container with an explicit boot directory so offset-mounted images
+# do not embed a chroot-local /dev/loop path that GRUB cannot resolve at boot.
+grub-install --boot-directory="${WORK_DIR}/mnt/boot" --target=i386-pc --force "${LOOP_DEV}"
 
 # Unmount API filesystems before cleanup
 umount "${WORK_DIR}/mnt/dev" 2>/dev/null || true
 umount "${WORK_DIR}/mnt/proc" 2>/dev/null || true
 umount "${WORK_DIR}/mnt/sys" 2>/dev/null || true
+
+# Flush and unmount the target before converting the raw image, otherwise the
+# VMDK can be created from a still-mounted filesystem with pending writes.
+sync
+umount "${WORK_DIR}/mnt"
+if [[ "${LOOP_MAPPER_CREATED}" == "1" ]] && command -v kpartx >/dev/null 2>&1; then
+  kpartx -dv "${LOOP_DEV}" 2>/dev/null || true
+  LOOP_MAPPER_CREATED=0
+fi
+if [[ -n "${LOOP_DEV}" ]]; then
+  losetup -d "${LOOP_DEV}" 2>/dev/null || true
+  LOOP_DEV=""
+fi
 
 echo "==> cleanup"
 # Cleanup is handled automatically by the EXIT trap.

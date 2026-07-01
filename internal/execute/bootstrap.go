@@ -73,8 +73,12 @@ func BuildBootstrapPlan(opts InstallOptions) ([]string, error) {
 		if opts.Blueprint.StabilityPreference == "bleeding" && opts.Blueprint.BaseDistro == "debian" {
 			suite = "sid"
 		}
+		mirror := "http://deb.debian.org/debian"
+		if opts.Blueprint.BaseDistro == "ubuntu" {
+			mirror = "http://archive.ubuntu.com/ubuntu/"
+		}
 		steps := []string{
-			fmt.Sprintf("debootstrap --arch=amd64 %s %s http://deb.debian.org/debian", suite, mount),
+			fmt.Sprintf("debootstrap --no-check-gpg --extractor=ar --arch=amd64 %s %s %s", suite, mount, mirror),
 		}
 		if len(pkgs) > 0 {
 			steps = append(steps,
@@ -207,7 +211,14 @@ func runStep(step string, mount string, runner CommandRunner) error {
 
 	// 4. Handle debootstrap specially
 	if fields[0] == "debootstrap" {
-		if len(fields) < 5 || fields[3] != mount {
+		hasMount := false
+		for _, f := range fields {
+			if f == mount {
+				hasMount = true
+				break
+			}
+		}
+		if !hasMount {
 			return fmt.Errorf("invalid debootstrap command: %q", step)
 		}
 		return runner.Run("debootstrap", fields[1:]...)

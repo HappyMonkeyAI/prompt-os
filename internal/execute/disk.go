@@ -1,8 +1,10 @@
 package execute
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,6 +30,7 @@ type PrepareOptions struct {
 	ConfirmWipe bool
 	EFIMiB      int // EFI partition size; 0 uses default 512
 	SwapGiB     int // 0 disables swap partition
+	MountRoot   string
 }
 
 // PrepareResult summarizes planned or executed work.
@@ -52,7 +55,28 @@ func (osRunner) Output(name string, args ...string) ([]byte, error) {
 }
 
 func (osRunner) Run(name string, args ...string) error {
-	return exec.Command(name, args...).Run()
+	cmd := exec.Command(name, args...)
+	var stderr bytes.Buffer
+
+	// Append command execution stdout/stderr logs to /tmp/promptos-install.log
+	logFile, err := os.OpenFile("/tmp/promptos-install.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err == nil {
+		defer logFile.Close()
+		logFile.WriteString(fmt.Sprintf("\n=== Running: %s %s ===\n", name, strings.Join(args, " ")))
+		cmd.Stdout = logFile
+		cmd.Stderr = io.MultiWriter(&stderr, logFile)
+	} else {
+		cmd.Stderr = &stderr
+	}
+
+	err = cmd.Run()
+	if err != nil {
+		if stderr.Len() > 0 {
+			return fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+		}
+		return err
+	}
+	return nil
 }
 
 func (osRunner) Stat(path string) (os.FileInfo, error) {
@@ -177,7 +201,47 @@ func BuildPreparePlan(opts PrepareOptions) ([]string, error) {
 			fmt.Sprintf("parted -s %s mkpart primary ext4 %dMiB 100%%", device, efi),
 		)
 	}
+
+	mountRoot := opts.MountRoot
+	if mountRoot == "" {
+		mountRoot = "/mnt/promptos-target"
+	}
+	efiPart := partitionPath(device, 1)
+	rootPart := partitionPath(device, 2)
+	if opts.SwapGiB > 0 {
+		swapPart := partitionPath(device, 2)
+		rootPart = partitionPath(device, 3)
+		steps = append(steps,
+			fmt.Sprintf("partprobe %s", device),
+			fmt.Sprintf("mkfs.fat -F32 %s", efiPart),
+			fmt.Sprintf("mkswap %s", swapPart),
+			fmt.Sprintf("mkfs.ext4 -F %s", rootPart),
+			fmt.Sprintf("mkdir -p %s", mountRoot),
+			fmt.Sprintf("mount %s %s", rootPart, mountRoot),
+			fmt.Sprintf("mkdir -p %s/boot/efi", mountRoot),
+			fmt.Sprintf("mount %s %s/boot/efi", efiPart, mountRoot),
+			fmt.Sprintf("swapon %s", swapPart),
+		)
+		return steps, nil
+	}
+	steps = append(steps,
+		fmt.Sprintf("partprobe %s", device),
+		fmt.Sprintf("mkfs.fat -F32 %s", efiPart),
+		fmt.Sprintf("mkfs.ext4 -F %s", rootPart),
+		fmt.Sprintf("mkdir -p %s", mountRoot),
+		fmt.Sprintf("mount %s %s", rootPart, mountRoot),
+		fmt.Sprintf("mkdir -p %s/boot/efi", mountRoot),
+		fmt.Sprintf("mount %s %s/boot/efi", efiPart, mountRoot),
+	)
 	return steps, nil
+}
+
+func partitionPath(device string, number int) string {
+	base := filepath.Base(device)
+	if strings.HasPrefix(base, "nvme") || strings.HasPrefix(base, "mmcblk") {
+		return fmt.Sprintf("%sp%d", device, number)
+	}
+	return fmt.Sprintf("%s%d", device, number)
 }
 
 // PrepareDisk validates the target and either plans (dry-run) or executes steps.

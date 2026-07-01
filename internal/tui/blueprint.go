@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/HappyMonkeyAI/prompt-os/internal/execute"
@@ -36,7 +35,7 @@ func NewBlueprintModel(client llm.LLMClient, wizard WizardModel, hw hardware.Har
 	}
 }
 
-func (m BlueprintModel) Init() tea.Cmd {
+func (m BlueprintModel) generateCmd() tea.Cmd {
 	return func() tea.Msg {
 		userPrompt := fmt.Sprintf(
 			"User preferences: %v\nHardware: %+v\nGenerate a Linux installation blueprint.",
@@ -57,6 +56,10 @@ func (m BlueprintModel) Init() tea.Cmd {
 	}
 }
 
+func (m BlueprintModel) Init() tea.Cmd {
+	return m.generateCmd()
+}
+
 func (m BlueprintModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case blueprintMsg:
@@ -68,21 +71,64 @@ func (m BlueprintModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case execDoneMsg:
 		m.executing = false
 		m.execDone = true
+		m.execErr = msg.err
+		if msg.err == nil {
+			m.execSteps = msg.steps
+		}
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "r":
+			if m.err != nil && !m.loading {
+				m.err = nil
+				m.loading = true
+				return m, m.generateCmd()
+			}
 		case "c":
 			if m.blueprint != nil && !m.executing && !m.execDone {
+				m.executing = true
 				return m, m.runConfirm()
 			}
 		case "d":
 			if m.blueprint != nil && !m.executing && !m.execDone {
-				m.execSteps, _ = execute.BuildBootstrapPlan(execute.InstallOptions{
+				m.execSteps = nil
+				if disk := selectedTargetDisk(m.wizard.Answers()); disk != "" {
+					if steps, err := execute.BuildPreparePlan(execute.PrepareOptions{Device: disk, DryRun: true, MountRoot: "/mnt/promptos-target"}); err == nil {
+						m.execSteps = append(m.execSteps, steps...)
+					} else {
+						m.execErr = err
+						m.execDone = true
+						return m, nil
+					}
+				}
+				steps, err := execute.BuildBootstrapPlan(execute.InstallOptions{
 					Blueprint: m.blueprint,
 					MountRoot: "/mnt/promptos-target",
 					DryRun:    true,
 				})
+				if err != nil {
+					m.execErr = err
+					m.execDone = true
+					return m, nil
+				}
+				m.execSteps = append(m.execSteps, steps...)
+
+				if len(m.blueprint.Configs) > 0 {
+					configSteps, err := execute.BuildConfigDropPlan(execute.ConfigDropOptions{
+						Blueprint: m.blueprint,
+						MountRoot: "/mnt/promptos-target",
+						DryRun:    true,
+					})
+					if err != nil {
+						m.execErr = err
+						m.execDone = true
+						return m, nil
+					}
+					for _, f := range configSteps {
+						m.execSteps = append(m.execSteps, fmt.Sprintf("write config: %s", f))
+					}
+				}
 				m.execDone = true
 			}
 		}
@@ -97,7 +143,7 @@ func (m BlueprintModel) View() string {
 		return style.Render("Generating blueprint with " + m.client.Name() + "...\n\n(Press q to quit)")
 	}
 	if m.err != nil {
-		return style.Render("Error: " + m.err.Error() + "\n\n(Press q to quit)")
+		return style.Render("Error: " + m.err.Error() + "\n\n(Press r to retry · Press q to quit)")
 	}
 
 	var sb strings.Builder
@@ -127,29 +173,57 @@ func (m BlueprintModel) View() string {
 
 func (m BlueprintModel) runConfirm() tea.Cmd {
 	return func() tea.Msg {
-		m.executing = true
-		_, err := execute.InstallBaseSystem(execute.InstallOptions{
+		var runSteps []string
+
+		if disk := selectedTargetDisk(m.wizard.Answers()); disk != "" {
+			prepRes, err := execute.PrepareDisk(execute.PrepareOptions{Device: disk, ConfirmWipe: true, MountRoot: "/mnt/promptos-target"}, execute.DefaultRunner)
+			if err != nil {
+				return execDoneMsg{err: err}
+			}
+			runSteps = append(runSteps, prepRes.Steps...)
+		}
+
+		instRes, err := execute.InstallBaseSystem(execute.InstallOptions{
 			Blueprint: m.blueprint,
 			MountRoot: "/mnt/promptos-target",
 			DryRun:    false,
 			Confirm:   true,
-		}, noopRunner{})
+		}, execute.DefaultRunner)
 		if err != nil {
 			return execDoneMsg{err: err}
 		}
-		m.execSteps = []string{"base system staged for chroot"}
-		return execDoneMsg{}
+		runSteps = append(runSteps, instRes.Steps...)
+
+		if len(m.blueprint.Configs) > 0 {
+			dropRes, err := execute.ApplyConfigDrop(execute.ConfigDropOptions{
+				Blueprint: m.blueprint,
+				MountRoot: "/mnt/promptos-target",
+				DryRun:    false,
+				Confirm:   true,
+			})
+			if err != nil {
+				return execDoneMsg{err: err}
+			}
+			for _, f := range dropRes.Files {
+				runSteps = append(runSteps, fmt.Sprintf("write config: %s", f))
+			}
+		}
+
+		return execDoneMsg{steps: runSteps}
 	}
 }
 
 type execDoneMsg struct {
-	err error
+	steps []string
+	err   error
 }
 type blueprintMsg struct{ bp *llm.Blueprint }
 type errMsg struct{ err error }
 
-type noopRunner struct{}
-
-func (noopRunner) Output(name string, args ...string) ([]byte, error) { return nil, nil }
-func (noopRunner) Run(name string, args ...string) error               { return nil }
-func (noopRunner) Stat(path string) (os.FileInfo, error)              { return nil, nil }
+func selectedTargetDisk(answers map[string]string) string {
+	disk := strings.TrimSpace(answers["target_disk"])
+	if disk == "" || disk == "skip disk prep" {
+		return ""
+	}
+	return disk
+}

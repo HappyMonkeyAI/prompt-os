@@ -84,7 +84,20 @@ func TestBuildPreparePlanIncludesGPTAndEFI(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	joined := strings.Join(steps, "\n")
-	for _, want := range []string{"wipefs -a /dev/vdb", "mklabel gpt", "mkpart ESP", "set 1 esp on"} {
+	for _, want := range []string{"wipefs -a /dev/vdb", "mklabel gpt", "mkpart ESP", "set 1 esp on", "mkfs.ext4 -F /dev/vdb2", "mount /dev/vdb2 /mnt/promptos-target"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("missing step fragment %q in:\n%s", want, joined)
+		}
+	}
+}
+
+func TestBuildPreparePlanUsesPartitionSuffixForNVMe(t *testing.T) {
+	steps, err := BuildPreparePlan(PrepareOptions{Device: "/dev/nvme0n1", MountRoot: "/mnt/test"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	joined := strings.Join(steps, "\n")
+	for _, want := range []string{"mkfs.fat -F32 /dev/nvme0n1p1", "mkfs.ext4 -F /dev/nvme0n1p2", "mount /dev/nvme0n1p2 /mnt/test"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("missing step fragment %q in:\n%s", want, joined)
 		}

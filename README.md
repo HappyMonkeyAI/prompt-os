@@ -44,3 +44,6 @@ PromptOS (chosen after availability check; academic paper only, no active OS/dis
 - Execution: archinstall / debootstrap / pacstrap
 
 See `docs/plans/2026-06-25-prompt-os-implementation-plan.md` for the detailed roadmap.
+
+cd /home/stephen/projects/prompt-os
+sudo bash build/scripts/build-iso.sh

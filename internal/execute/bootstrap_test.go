@@ -161,7 +161,7 @@ func TestInstallBaseSystemDebian(t *testing.T) {
 	}
 
 	expectedRuns := [][]string{
-		{"debootstrap", "--arch=amd64", "bookworm", mount, "http://deb.debian.org/debian"},
+		{"debootstrap", "--no-check-gpg", "--extractor=ar", "--arch=amd64", "bookworm", mount, "http://deb.debian.org/debian"},
 		{"chroot", mount, "apt-get", "update"},
 		{"chroot", mount, "apt-get", "install", "-y", "htop"},
 	}
